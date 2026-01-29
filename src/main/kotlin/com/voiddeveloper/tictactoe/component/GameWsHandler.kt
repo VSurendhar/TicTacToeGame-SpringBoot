@@ -21,11 +21,13 @@ import org.springframework.web.socket.CloseStatus
 import org.springframework.web.socket.TextMessage
 import org.springframework.web.socket.WebSocketSession
 import org.springframework.web.socket.handler.TextWebSocketHandler
+import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.ConcurrentMap
 
 @Component
 class GameWsHandler : TextWebSocketHandler() {
 
-    val gameRooms: MutableMap<String, Room> = HashMap()
+    val gameRooms: ConcurrentMap<String, Room> = ConcurrentHashMap()
 
     @Autowired
     private lateinit var tokenHandler: TokenHandler
