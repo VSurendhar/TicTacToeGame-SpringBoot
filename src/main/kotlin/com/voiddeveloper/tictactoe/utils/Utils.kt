@@ -16,11 +16,15 @@ object Utils {
     }
 
     fun WebSocketSession.getSecureRoomId(): String? {
-        return this.attributes["roomId"] as String?
+        return this.attributes["roomId"] as String
     }
 
     fun WebSocketSession.getSecureUserId(): String? {
-        return this.attributes["userId"] as String?
+        return this.attributes["userId"] as String
+    }
+
+    fun WebSocketSession.getCoin(): Char {
+        return (this.attributes["coin"] as String?)?.get(0) ?: ' '
     }
 
     fun WebSocketSession.setSecureUserId(userId: String) {
@@ -29,6 +33,14 @@ object Utils {
 
     fun WebSocketSession.setSecureRoomId(roomId: String) {
         this.attributes["roomId"] = roomId
+    }
+
+    fun WebSocketSession.setCoin(coin: Char) {
+        this.attributes["coin"] = coin.toString()
+    }
+
+    fun String?.getCleanId(): String? {
+        return this?.split(".")?.firstOrNull()
     }
 
 }

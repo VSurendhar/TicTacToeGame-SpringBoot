@@ -2,9 +2,14 @@ package com.voiddeveloper.tictactoe.component
 
 import com.voiddeveloper.tictactoe.model.GameActionType
 import com.voiddeveloper.tictactoe.model.GameStatePayload
+import com.voiddeveloper.tictactoe.model.Room
 import com.voiddeveloper.tictactoe.model.ServerResponse
 import com.voiddeveloper.tictactoe.utils.Utils.generateRandomCode
+import com.voiddeveloper.tictactoe.utils.Utils.getCleanId
+import com.voiddeveloper.tictactoe.utils.Utils.getCoin
 import com.voiddeveloper.tictactoe.utils.Utils.getSecureRoomId
+import com.voiddeveloper.tictactoe.utils.Utils.getSecureUserId
+import com.voiddeveloper.tictactoe.utils.Utils.setCoin
 import com.voiddeveloper.tictactoe.utils.Utils.setSecureRoomId
 import com.voiddeveloper.tictactoe.utils.Utils.setSecureUserId
 import kotlinx.serialization.ExperimentalSerializationApi
@@ -20,7 +25,7 @@ import org.springframework.web.socket.handler.TextWebSocketHandler
 @Component
 class GameWsHandler : TextWebSocketHandler() {
 
-    val gameRooms: MutableMap<String, MutableList<WebSocketSession>> = HashMap()
+    val gameRooms: MutableMap<String, Room> = HashMap()
 
     @Autowired
     private lateinit var tokenHandler: TokenHandler
@@ -56,9 +61,9 @@ class GameWsHandler : TextWebSocketHandler() {
         val secureRoomId: String? = session.getSecureRoomId()
         val validRoomID = secureRoomId?.let { tokenHandler.verifyRoomToken(it) } ?: false
 
-        val roomId = secureRoomId?.split(".")?.get(0)
+        val roomId = secureRoomId?.getCleanId()
 
-        if (roomId == null || !validRoomID || !gameRooms.containsKey(roomId)) {
+        if (roomId == null || !validRoomID || !gameRooms.containsKey(secureRoomId)) {
             println("$roomId is not a valid room")
             println(gameRooms)
             val response = ServerResponse(
@@ -76,11 +81,12 @@ class GameWsHandler : TextWebSocketHandler() {
             val secureUserId = tokenHandler.createUserToken(userId = userId)
 
             session.setSecureUserId(secureUserId)
+
             println("user ID - $userId")
             println("room ID - $roomId")
             println("secure user ID - $secureUserId")
 
-            val room = gameRooms[roomId] ?: run {
+            val room = gameRooms[secureRoomId] ?: run {
                 println(gameRooms)
                 val response = ServerResponse(
                     message = GameStatePayload(
@@ -93,7 +99,7 @@ class GameWsHandler : TextWebSocketHandler() {
                 return
             }
 
-            if (gameRooms[roomId]?.size == 2) {
+            if (gameRooms[secureRoomId]?.socketList?.size == 2) {
                 println(gameRooms)
                 val response = ServerResponse(
                     message = GameStatePayload(
@@ -106,8 +112,11 @@ class GameWsHandler : TextWebSocketHandler() {
                 return
             }
 
+            val availableCoin = room.availableCoins[0]
+            session.setCoin(availableCoin)
+            room.availableCoins.remove(availableCoin)
 
-            room.add(session)
+            room.socketList.add(session)
             println("$roomId is available and user added to room")
 
 
@@ -140,8 +149,12 @@ class GameWsHandler : TextWebSocketHandler() {
         session.setSecureRoomId(secureRoomId)
 
         gameRooms.put(
-            roomId, mutableListOf(session)
+            secureRoomId, Room(socketList = mutableListOf(session))
         )
+
+        val selectedCoin = gameRooms[secureRoomId]?.availableCoins?.random() ?: ' '
+        session.setCoin(selectedCoin)
+        gameRooms[secureRoomId]?.availableCoins?.remove(selectedCoin) ?: ' '
 
         println("room created!!!!!")
         println(gameRooms)
@@ -163,22 +176,31 @@ class GameWsHandler : TextWebSocketHandler() {
     override fun afterConnectionClosed(session: WebSocketSession, status: CloseStatus) {
         super.afterConnectionClosed(session, status)
         val room = gameRooms[session.getSecureRoomId()]
-        room?.forEach { session ->
-//            TODO()
-            /*val serverResponse = ServerResponse(
-                userId = session.attributes["userId"] as? String ?: "",
-                roomId = session.attributes["roomId"] as? String ?: "",
+        val disconnectedPlayer = session.getSecureUserId().getCleanId()
+        val disconnectedCoin = session.getCoin()
+        room?.socketList?.forEach { session ->
+            val serverResponse = ServerResponse(
                 message = GameStatePayload(
-                    content = "Player ${} Disconnected",
+                    content = "Player $disconnectedPlayer Disconnected",
                     command = GameActionType.PLAYER_DISCONNECTED
                 )
-            )*/
-            session.sendMessage(TextMessage("${session.getSecureRoomId()} closed"))
+            )
+            val responseStr = json.encodeToString<ServerResponse>(serverResponse)
+            session.sendMessage(TextMessage(responseStr))
+        }
+        println("Removing Session $session")
+        room?.socketList?.remove(session)
+        room?.availableCoins?.add(disconnectedCoin)
+        if (room?.socketList?.isEmpty() == true) {
+            gameRooms.remove(session.getSecureRoomId())
         }
     }
 
     override fun handleTextMessage(session: WebSocketSession, message: TextMessage) {
         super.handleTextMessage(session, message)
+//        CheckForValidCoin()
+//        CheckForValidRoom()
+//        CheckForValidUser()
 //        TODO("Game Logic")
     }
 
