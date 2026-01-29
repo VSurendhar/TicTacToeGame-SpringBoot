@@ -4,7 +4,12 @@ import com.voiddeveloper.tictactoe.model.GameActionType
 import com.voiddeveloper.tictactoe.model.GameStatePayload
 import com.voiddeveloper.tictactoe.model.ServerResponse
 import com.voiddeveloper.tictactoe.utils.Utils.generateRandomCode
-import com.voiddeveloper.tictactoe.utils.Utils.serialize
+import com.voiddeveloper.tictactoe.utils.Utils.getSecureRoomId
+import com.voiddeveloper.tictactoe.utils.Utils.setSecureRoomId
+import com.voiddeveloper.tictactoe.utils.Utils.setSecureUserId
+import kotlinx.serialization.ExperimentalSerializationApi
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.Json
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.stereotype.Component
 import org.springframework.web.socket.CloseStatus
@@ -20,6 +25,11 @@ class GameWsHandler : TextWebSocketHandler() {
     @Autowired
     private lateinit var tokenHandler: TokenHandler
 
+    @OptIn(ExperimentalSerializationApi::class)
+    val json = Json {
+        explicitNulls = false
+    }
+
 
     override fun afterConnectionEstablished(session: WebSocketSession) {
         super.afterConnectionEstablished(session)
@@ -29,14 +39,21 @@ class GameWsHandler : TextWebSocketHandler() {
             "create_room" -> createRoom(session)
             "join_room" -> joinRoom(session)
             else -> {
-                session.sendMessage(TextMessage("invalid action"))
+                val response = ServerResponse(
+                    message = GameStatePayload(
+                        content = "invalid action",
+                        command = GameActionType.INVALID_ACTION
+                    )
+                )
+                val responseStr = json.encodeToString<ServerResponse>(response)
+                session.sendMessage(TextMessage(responseStr))
             }
         }
     }
 
     private fun joinRoom(session: WebSocketSession) {
 
-        val secureRoomId: String? = session.attributes["roomId"] as? String
+        val secureRoomId: String? = session.getSecureRoomId()
         val validRoomID = secureRoomId?.let { tokenHandler.verifyRoomToken(it) } ?: false
 
         val roomId = secureRoomId?.split(".")?.get(0)
@@ -44,22 +61,51 @@ class GameWsHandler : TextWebSocketHandler() {
         if (roomId == null || !validRoomID || !gameRooms.containsKey(roomId)) {
             println("$roomId is not a valid room")
             println(gameRooms)
-            session.sendMessage(TextMessage("Invalid Room Id or Room Id Missing"))
+            val response = ServerResponse(
+                message = GameStatePayload(
+                    content = "Invalid Room Id or Room Id Missing",
+                    command = GameActionType.INVALID_CREDENTIALS
+                )
+            )
+            val responseStr = json.encodeToString<ServerResponse>(response)
+            session.sendMessage(TextMessage(responseStr))
             return
         } else {
 
             val userId = generateRandomCode()
             val secureUserId = tokenHandler.createUserToken(userId = userId)
 
+            session.setSecureUserId(secureUserId)
             println("user ID - $userId")
             println("room ID - $roomId")
             println("secure user ID - $secureUserId")
 
             val room = gameRooms[roomId] ?: run {
                 println(gameRooms)
-                session.sendMessage(TextMessage("Invalid Room Id or Room Id Missing"))
+                val response = ServerResponse(
+                    message = GameStatePayload(
+                        content = "Invalid Room Id or Room Id Missing",
+                        command = GameActionType.INVALID_CREDENTIALS
+                    )
+                )
+                val responseStr = json.encodeToString<ServerResponse>(response)
+                session.sendMessage(TextMessage(responseStr))
                 return
             }
+
+            if (gameRooms[roomId]?.size == 2) {
+                println(gameRooms)
+                val response = ServerResponse(
+                    message = GameStatePayload(
+                        content = "Room Already Full",
+                        command = GameActionType.ROOM_FULL
+                    )
+                )
+                val responseStr = json.encodeToString<ServerResponse>(response)
+                session.sendMessage(TextMessage(responseStr))
+                return
+            }
+
 
             room.add(session)
             println("$roomId is available and user added to room")
@@ -69,10 +115,11 @@ class GameWsHandler : TextWebSocketHandler() {
                 userId = secureUserId, roomId = secureRoomId, message = GameStatePayload(
                     command = GameActionType.PLAYER_CONNECTED, content = "Room is Available and you are connected"
                 )
-            ).serialize()
+            )
+            val serverResponseStr = json.encodeToString(serverResponse)
 
             println(gameRooms)
-            session.sendMessage(TextMessage(serverResponse))
+            session.sendMessage(TextMessage(serverResponseStr))
 
         }
     }
@@ -89,6 +136,9 @@ class GameWsHandler : TextWebSocketHandler() {
         println("secure user ID - $secureUserId")
         println("secure room ID - $secureRoomId")
 
+        session.setSecureUserId(secureUserId)
+        session.setSecureRoomId(secureRoomId)
+
         gameRooms.put(
             roomId, mutableListOf(session)
         )
@@ -100,17 +150,19 @@ class GameWsHandler : TextWebSocketHandler() {
             userId = secureUserId, roomId = secureRoomId, message = GameStatePayload(
                 command = GameActionType.PLAYER_CONNECTED, content = "Room is Created and you are connected"
             )
-        ).serialize()
+        )
+
+        val serverResponseStr = json.encodeToString(serverResponse)
 
         println("server response: $serverResponse")
 
-        session.sendMessage(TextMessage(serverResponse))
+        session.sendMessage(TextMessage(serverResponseStr))
 
     }
 
     override fun afterConnectionClosed(session: WebSocketSession, status: CloseStatus) {
         super.afterConnectionClosed(session, status)
-        val room = gameRooms[session.attributes["roomId"]]
+        val room = gameRooms[session.getSecureRoomId()]
         room?.forEach { session ->
 //            TODO()
             /*val serverResponse = ServerResponse(
@@ -121,12 +173,13 @@ class GameWsHandler : TextWebSocketHandler() {
                     command = GameActionType.PLAYER_DISCONNECTED
                 )
             )*/
-            session.sendMessage(TextMessage("${session.attributes["roomId"]} closed"))
+            session.sendMessage(TextMessage("${session.getSecureRoomId()} closed"))
         }
     }
 
     override fun handleTextMessage(session: WebSocketSession, message: TextMessage) {
         super.handleTextMessage(session, message)
+//        TODO("Game Logic")
     }
 
 

@@ -1,9 +1,10 @@
 package com.voiddeveloper.tictactoe.component
 
-import com.google.gson.Gson
 import com.voiddeveloper.tictactoe.FakeWebSocketSession
+import com.voiddeveloper.tictactoe.model.GameActionType
 import com.voiddeveloper.tictactoe.model.ServerResponse
 import com.voiddeveloper.tictactoe.utils.Utils.generateRandomCode
+import kotlinx.serialization.json.Json
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
 import kotlin.test.Test
@@ -17,6 +18,8 @@ class GameWsHandlerTest {
     @Autowired
     private lateinit var gameWsHandler: GameWsHandler
 
+    val json: Json = Json {}
+
     @Test
     fun `should create room when action is create_room`() {
 
@@ -25,18 +28,20 @@ class GameWsHandlerTest {
 
         gameWsHandler.afterConnectionEstablished(session1)
         val payload = session1.sentMessages.first().payload
-        val secureUserId = Gson().fromJson(payload, ServerResponse::class.java).userId
-        val secureRoomId = Gson().fromJson(payload, ServerResponse::class.java).roomId
+
+        val response = json.decodeFromString<ServerResponse>(payload)
+        val secureUserId = response.userId
+        val secureRoomId = response.roomId
 
         println(secureUserId)
-        val room = secureRoomId.split(".")[0]
+        val room = secureRoomId?.split(".")[0]
 
         assertTrue(
-            payload.contains(
-                """
-                "message":{"content":"Room is Created and you are connected","command":"PLAYER_CONNECTED"}
-                """.trimIndent()
-            )
+            response.message?.content == "Room is Created and you are connected"
+        )
+
+        assertTrue(
+            response.message.command == GameActionType.PLAYER_CONNECTED
         )
 
         assertTrue(gameWsHandler.gameRooms.contains(room))
@@ -53,27 +58,22 @@ class GameWsHandlerTest {
         gameWsHandler.afterConnectionEstablished(creatorSession)
 
         val creatorPayload = creatorSession.sentMessages.first().payload
-        val creatorResponse = Gson().fromJson(creatorPayload, ServerResponse::class.java)
+        val creatorResponse = json.decodeFromString<ServerResponse>(creatorPayload)
         val secureRoomId = creatorResponse.roomId
 
-        val roomKey = secureRoomId.split(".")[0]
+        val roomKey = secureRoomId?.split(".")[0]
 
         val joinerSession = FakeWebSocketSession()
         joinerSession.attributes["action"] = "join_room"
-        joinerSession.attributes["roomId"] = secureRoomId
+        joinerSession.attributes["roomId"] = secureRoomId ?: 0
 
         gameWsHandler.afterConnectionEstablished(joinerSession)
 
         val joinerPayload = joinerSession.sentMessages.first().payload
-        val joinerResponse = Gson().fromJson(joinerPayload, ServerResponse::class.java)
+        val joinerResponse = json.decodeFromString<ServerResponse>(joinerPayload)
 
-        assertTrue(
-            joinerPayload.contains(
-                """
-            "message":{"content":"Room is Available and you are connected","command":"PLAYER_CONNECTED"}
-            """.trimIndent()
-            )
-        )
+        assertTrue(joinerResponse.message?.content == "Room is Available and you are connected")
+        assertTrue(joinerResponse.message.command == GameActionType.PLAYER_CONNECTED)
 
         assertTrue(gameWsHandler.gameRooms.containsKey(roomKey))
 
@@ -94,29 +94,27 @@ class GameWsHandlerTest {
         gameWsHandler.afterConnectionEstablished(creatorSession)
 
         val creatorPayload = creatorSession.sentMessages.first().payload
-        val creatorResponse = Gson().fromJson(creatorPayload, ServerResponse::class.java)
+        val creatorResponse = json.decodeFromString<ServerResponse>(creatorPayload)
         val secureRoomId = creatorResponse.roomId
 
-        val creatorRoomKey = secureRoomId.split(".")[0]
+        val creatorRoomKey = secureRoomId?.split(".")[0]
         val pamperdRoomKey = generateRandomCode()
 
         val joinerSession = FakeWebSocketSession()
         joinerSession.attributes["action"] = "join_room"
-        val secureRoomIdForJoiner = secureRoomId.split(".").let { parts ->
-            if (parts.size > 1) "${pamperdRoomKey}.${parts[1]}" else pamperdRoomKey
+        val secureRoomIdForJoiner = secureRoomId?.split(".").let { parts ->
+            parts?.size?.let { if (it > 1) "${pamperdRoomKey}.${parts[1]}" else pamperdRoomKey }
         }
 
-        joinerSession.attributes["roomId"] = secureRoomIdForJoiner
+        joinerSession.attributes["roomId"] = secureRoomIdForJoiner ?: 0
 
         gameWsHandler.afterConnectionEstablished(joinerSession)
 
         val joinerPayload = joinerSession.sentMessages.first().payload
 
-        assertTrue(
-            joinerPayload.contains(
-                "Invalid Room Id or Room Id Missing"
-            )
-        )
+        val joinerResponse = json.decodeFromString<ServerResponse>(joinerPayload)
+        assertTrue(joinerResponse.message?.content == "Invalid Room Id or Room Id Missing")
+        assertTrue(joinerResponse.message?.command == GameActionType.INVALID_CREDENTIALS)
 
         assertFalse(gameWsHandler.gameRooms.containsKey(pamperdRoomKey))
 
