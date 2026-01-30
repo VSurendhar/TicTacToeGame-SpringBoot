@@ -32,4 +32,5 @@ class QueryParamHandshakeInterceptor : HandshakeInterceptor {
         wsHandler: WebSocketHandler,
         exception: Exception?
     ) {}
+
 }

@@ -23,8 +23,8 @@ object Utils {
         return this.attributes["userId"] as String
     }
 
-    fun WebSocketSession.getCoin(): Char {
-        return (this.attributes["coin"] as String?)?.get(0) ?: ' '
+    fun WebSocketSession.getCoin(): Char? {
+        return (this.attributes["coin"] as String?)?.get(0)
     }
 
     fun WebSocketSession.setSecureUserId(userId: String) {
@@ -42,5 +42,8 @@ object Utils {
     fun String?.getCleanId(): String? {
         return this?.split(".")?.firstOrNull()
     }
+
+    fun List<List<Char?>>.snapShotList() = this.map { it.toList() }
+
 
 }

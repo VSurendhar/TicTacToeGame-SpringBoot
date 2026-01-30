@@ -1,56 +1,57 @@
 package com.voiddeveloper.tictactoe.component
 
-import com.voiddeveloper.tictactoe.model.GameResult
-import com.voiddeveloper.tictactoe.model.GameStatus
+import com.voiddeveloper.tictactoe.model.GameEvent
+import com.voiddeveloper.tictactoe.utils.Utils.snapShotList
 
 class GameController(
     private val size: Int = 3,
 ) {
 
-    private val board: List<MutableList<Char?>> = List(size) { MutableList(size) { null } }
+    fun mark(
+        row: Int,
+        col: Int,
+        player: Char,
+        board: List<MutableList<Char?>>
+    ): GameEvent {
 
-    private var winner: Char? = null
-
-    fun mark(row: Int, col: Int, player: Char): GameResult {
-
-        // Invalid or already filled
+        // Invalid index or already filled
         if (row !in 0 until size || col !in 0 until size || board[row][col] != null) {
-            return GameResult(
-                status = GameStatus.AlreadyFilled, board = snapshotBoard()
-            )
+            return GameEvent.AlreadyFilled
         }
 
         // Mark the board
         board[row][col] = player
 
         // Check win
-        if (isWin(player)) {
-            winner = player
-            return GameResult(
-                status = GameStatus.Win(player), board = snapshotBoard()
-            )
+        if (isWin(player, board)) {
+            return GameEvent.Win(player)
         }
 
         // Check draw
-        if (isDraw()) {
-            return GameResult(
-                status = GameStatus.Draw, board = snapshotBoard()
-            )
+        if (isDraw(board)) {
+            return GameEvent.Tie
         }
 
-        // Normal successful move (no win, no draw)
-        return GameResult(
-            status = GameStatus.Accepted, board = snapshotBoard()
+        // Valid move, game continues
+        return GameEvent.MoveAccepted(
+            board = board.snapShotList()
         )
-
     }
 
-    private fun isDraw(): Boolean {
+    private fun isDraw(board: List<MutableList<Char?>>): Boolean {
         val allFilled = board.all { row -> row.all { it != null } }
-        return allFilled && winner == null
+        val coins = board.flatten().distinct()
+        coins.forEach { coin ->
+            if (isWin(coin, board)) {
+                return false
+            }
+        }
+        return allFilled
     }
 
-    private fun isWin(player: Char): Boolean {
+    private fun isWin(player: Char?, board: List<MutableList<Char?>>): Boolean {
+
+        if (player == null) return false
 
         // Horizontal
         for (row in 0 until size) {
@@ -78,8 +79,5 @@ class GameController(
 
         return false
     }
-
-
-    private fun snapshotBoard(): List<List<Char?>> = board.map { it.toList() }
 
 }

@@ -1,7 +1,7 @@
 package com.voiddeveloper.tictactoe.component
 
-import com.voiddeveloper.tictactoe.model.GameResult
-import com.voiddeveloper.tictactoe.model.GameStatus
+import com.voiddeveloper.tictactoe.model.GameEvent
+import org.junit.jupiter.api.Assertions.assertNotNull
 import org.springframework.boot.test.context.SpringBootTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -11,10 +11,12 @@ import kotlin.test.assertTrue
 class GameControllerTest {
 
     @Test
-    fun `should return DRAW when board is completely filled without winner`() {
+    fun `should return TIE when board is completely filled without winner`() {
 
         val game = GameController()
+        val board = List(3) { MutableList<Char?>(3) { null } }
 
+        // Sequence of moves filling the board without a winner
         val moves = listOf(
             0 to 0 to 'X',
             0 to 1 to 'O',
@@ -27,52 +29,65 @@ class GameControllerTest {
             2 to 2 to 'X'
         )
 
-        var result: GameResult? = null
+        var event: GameEvent? = null
 
         moves.forEach { (pos, player) ->
             val (row, col) = pos
-            result = game.mark(row, col, player)
+            event = game.mark(row, col, player, board)
         }
 
-        assertTrue(result != null)
-        assertEquals(GameStatus.Draw, result!!.status)
+        assertNotNull(event)
 
-        // Board should be fully filled
-        assertTrue(result!!.board.flatten().all { it != null })
+        // Assert that the last move triggered a Tie
+        assertTrue(event is GameEvent.Tie)
+
+        // Check that the board is fully filled
+        val flattenedBoard = board.flatten()
+        assertTrue(flattenedBoard.all { it != null })
     }
 
     @Test
     fun `should return WIN when a player completes a line`() {
 
         val game = GameController()
+        val board = List(3) { MutableList<Char?>(3) { null } }
 
-        game.mark(0, 0, 'X')
-        game.mark(0, 1, 'O')
-        game.mark(1, 1, 'X')
-        game.mark(0, 2, 'O')
+        // Fill board to trigger a win for 'X'
+        game.mark(0, 0, 'X', board)
+        game.mark(0, 1, 'O', board)
+        game.mark(1, 1, 'X', board)
+        game.mark(0, 2, 'O', board)
 
-        val result = game.mark(2, 2, 'X')
+        // Last move that should win
+        val event = game.mark(2, 2, 'X', board)
 
-        assertTrue(result.status is GameStatus.Win)
+        // Assert that the event is a Win
+        assertTrue(event is GameEvent.Win)
 
-        val winStatus = result.status
+        // Cast to access coin
+        val winEvent = event
 
-        assertEquals('X', winStatus.coin)
+        // Check the winning player
+        assertEquals('X', winEvent.coin)
 
     }
 
     @Test
-    fun `should return ACCEPTED for a normal valid move`() {
+    fun `should return MoveAccepted for a normal valid move`() {
 
         val game = GameController()
+        val board = List(3) { MutableList<Char?>(3) { null } }
 
-        val result = game.mark(1, 1, 'X')
+        val event = game.mark(1, 1, 'X', board)
 
-        assertEquals(GameStatus.Accepted, result.status)
+        // Check that the returned event is MoveAccepted
+        assertTrue(event is GameEvent.MoveAccepted)
 
-        assertEquals('X', result.board[1][1])
+        val moveAccepted = event
+
+        // Check that the board is updated
+        assertEquals('X', moveAccepted.board[1][1])
     }
-
 
 
 }

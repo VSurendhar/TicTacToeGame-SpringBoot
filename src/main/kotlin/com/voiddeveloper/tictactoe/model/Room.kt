@@ -5,7 +5,11 @@ import org.springframework.web.socket.WebSocketSession
 
 @Serializable
 class Room(
-    val socketList: MutableList<WebSocketSession> = mutableListOf(),
+    var socketList: MutableList<WebSocketSession> = mutableListOf(),
     val availableCoins: MutableList<Char> = mutableListOf('X', 'O'),
-    val totalCoins: MutableList<Char> = mutableListOf('X', 'O'),
-)
+    val board: List<MutableList<Char?>> = List(3) { MutableList(3) { null } },
+) {
+    fun toggleSocketList() {
+        socketList = (socketList.drop(1) + socketList.first()).toMutableList()
+    }
+}
