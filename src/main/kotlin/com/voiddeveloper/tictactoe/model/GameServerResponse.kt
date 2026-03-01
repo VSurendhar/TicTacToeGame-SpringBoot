@@ -57,10 +57,18 @@ sealed interface ServerEvent : Payload {
     ) : ServerEvent
 
     @Serializable
-        @SerialName("ROOM_CREATED")
+    @SerialName("ROOM_CREATED")
     object RoomCreated : ServerEvent {
         override fun toString(): String {
             return "ROOM_CREATED"
+        }
+    }
+
+    @Serializable
+    @SerialName("YOU ARE CONNECTED")
+    object YourConnected : ServerEvent {
+        override fun toString(): String {
+            return "YOU ARE CONNECTED"
         }
     }
 }
@@ -92,12 +100,8 @@ sealed interface GameEvent : Payload {
     }
 
     @Serializable
-    @SerialName("YOUR_TURN")
-    object YourTurn : GameEvent {
-        override fun toString(): String {
-            return "YOUR_TURN"
-        }
-    }
+    @SerialName("TURN")
+    data class Turn(val playerCoin: Char?, val board: List<List<Char?>>) : GameEvent
 
     @Serializable
     @SerialName("INVALID_MOVE")
@@ -111,11 +115,12 @@ sealed interface GameEvent : Payload {
     @SerialName("WIN")
     data class Win(
         val coin: Char,
+        val board: List<List<Char?>>
     ) : GameEvent
 
     @Serializable
     @SerialName("TIE")
-    object Tie : GameEvent {
+    data class Tie(val board: List<List<Char?>>) : GameEvent {
         override fun toString(): String {
             return "TIE"
         }

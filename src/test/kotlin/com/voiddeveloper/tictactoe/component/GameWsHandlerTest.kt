@@ -3,6 +3,7 @@ package com.voiddeveloper.tictactoe.component
 import com.voiddeveloper.tictactoe.FakeWebSocketSession
 import com.voiddeveloper.tictactoe.model.*
 import com.voiddeveloper.tictactoe.utils.Utils.generateRandomCode
+import com.voiddeveloper.tictactoe.utils.Utils.getCleanId
 import com.voiddeveloper.tictactoe.utils.Utils.getCoin
 import kotlinx.serialization.json.Json
 import org.junit.jupiter.api.Assertions.assertEquals
@@ -41,20 +42,21 @@ class GameWsHandlerTest {
         // Decode using the new model
         val response = json.decodeFromString<GameServerResponse>(payload)
 
-        val secureUserId = response.userId
-        val secureRoomId = response.roomId
+        val response2 = json.decodeFromString<GameServerResponse>( session1.sentMessages[1].payload)
 
-        println(secureUserId)
+        val secureUserId = response2.userId
+        val secureRoomId = response2.roomId
+        val roomId = secureRoomId.getCleanId()
 
         // --- Assertions ---
 
         assertTrue(response.message is ServerEvent.RoomCreated)
 
         // The room should exist on the server
-        assertTrue(gameWsHandler.gameRooms.containsKey(secureRoomId))
+        assertTrue(gameWsHandler.gameRooms.containsKey(roomId))
 
         // Session should be added to room
-        val room = gameWsHandler.gameRooms[secureRoomId]
+        val room = gameWsHandler.gameRooms[roomId]
         assertTrue(room?.socketList?.firstOrNull { it == session1 } != null)
     }
 
@@ -67,34 +69,34 @@ class GameWsHandlerTest {
 
         gameWsHandler.afterConnectionEstablished(creatorSession)
 
-        val creatorPayload = creatorSession.sentMessages.first().payload
+        val creatorPayload = creatorSession.sentMessages[1].payload
         val creatorResponse = json.decodeFromString<GameServerResponse>(creatorPayload)
         val secureRoomId = creatorResponse.roomId
+        val roomId = secureRoomId.getCleanId()
 
         // --- Joiner joins the same room ---
         val joinerSession = FakeWebSocketSession()
         joinerSession.attributes["action"] = "join_room"
-        joinerSession.attributes["roomId"] = secureRoomId ?: ""
+        joinerSession.attributes["roomId"] = roomId ?: ""
 
         gameWsHandler.afterConnectionEstablished(joinerSession)
 
-        val joinerPayload = joinerSession.sentMessages.first().payload
+        val joinerPayload = joinerSession.sentMessages[0].payload
         val joinerResponse = json.decodeFromString<GameServerResponse>(joinerPayload)
 
         // --- Assertions ---
 
         // Payload should be PlayerConnected
-        assertTrue(joinerResponse.message is ServerEvent.PlayerConnected)
+        assertTrue(joinerResponse.message is ServerEvent.YourConnected)
 
         // Room should exist
-        assertTrue(gameWsHandler.gameRooms.containsKey(secureRoomId))
+        assertTrue(gameWsHandler.gameRooms.containsKey(roomId))
 
         // Room should contain both sessions
-        val roomSessions = gameWsHandler.gameRooms[secureRoomId]
+        val roomSessions = gameWsHandler.gameRooms[roomId]
         assertTrue(roomSessions?.socketList?.contains(creatorSession) == true)
         assertTrue(roomSessions.socketList.contains(joinerSession) == true)
 
-        println("Room sessions: $roomSessions")
     }
 
     @Test
@@ -105,9 +107,10 @@ class GameWsHandlerTest {
         creatorSession.attributes["action"] = "create_room"
         gameWsHandler.afterConnectionEstablished(creatorSession)
 
-        val creatorPayload = creatorSession.sentMessages.first().payload
+        val creatorPayload = creatorSession.sentMessages[1].payload
         val creatorResponse = json.decodeFromString<GameServerResponse>(creatorPayload)
         val secureRoomId = creatorResponse.roomId
+        val roomId = secureRoomId.getCleanId()
 
         // --- Tampered room ID for joiner ---
         val tamperedRoomKey = generateRandomCode()
@@ -140,8 +143,8 @@ class GameWsHandlerTest {
         assertFalse(gameWsHandler.gameRooms.containsKey(securedTamperedRoomKey))
 
         // Original room should still exist with the creator
-        assertTrue(gameWsHandler.gameRooms.containsKey(secureRoomId))
-        val room = gameWsHandler.gameRooms[secureRoomId]
+        assertTrue(gameWsHandler.gameRooms.containsKey(roomId))
+        val room = gameWsHandler.gameRooms[roomId]
         assertTrue(room?.socketList?.contains(creatorSession) == true)
 
         // Joiner should not be added to the room
@@ -158,9 +161,10 @@ class GameWsHandlerTest {
         creatorSession.attributes["action"] = "create_room"
         gameWsHandler.afterConnectionEstablished(creatorSession)
 
-        val creatorPayload = creatorSession.sentMessages.first().payload
+        val creatorPayload = creatorSession.sentMessages[1].payload
         val creatorResponse = json.decodeFromString<GameServerResponse>(creatorPayload)
         val secureRoomId = creatorResponse.roomId!!
+        val roomId = secureRoomId.getCleanId()
 
         // Joiner joins the same room
         val joinerSession = FakeWebSocketSession()
@@ -168,7 +172,7 @@ class GameWsHandlerTest {
         joinerSession.attributes["roomId"] = secureRoomId
         gameWsHandler.afterConnectionEstablished(joinerSession)
 
-        val room = gameWsHandler.gameRooms[secureRoomId]!!
+        val room = gameWsHandler.gameRooms[roomId]!!
 
         // Capture joiner's data before disconnect
         val joinerCoin = joinerSession.getCoin()
@@ -201,7 +205,7 @@ class GameWsHandlerTest {
         // val content = response.messageDescription // if you add such a field
 
         // 4️⃣ Room still exists
-        assertTrue(gameWsHandler.gameRooms.containsKey(secureRoomId))
+        assertTrue(gameWsHandler.gameRooms.containsKey(roomId))
     }
 
     @Test
@@ -214,11 +218,12 @@ class GameWsHandlerTest {
         // Create room
         gameWsHandler.afterConnectionEstablished(session)
 
-        val payload = session.sentMessages.first().payload
+        val payload = session.sentMessages[1].payload
         val response = json.decodeFromString<GameServerResponse>(payload)
 
         val secureRoomId = response.roomId!!
-        val roomBeforeClose = gameWsHandler.gameRooms[secureRoomId]!!
+        val roomId = secureRoomId.getCleanId()
+        val roomBeforeClose = gameWsHandler.gameRooms[roomId]!!
 
         // Room should exist and contain the session
         assertTrue(roomBeforeClose.socketList.contains(session))
@@ -246,9 +251,10 @@ class GameWsHandlerTest {
         creatorSession.attributes["action"] = "create_room"
         gameWsHandler.afterConnectionEstablished(creatorSession)
 
-        val creatorPayload = creatorSession.sentMessages.first().payload
+        val creatorPayload = creatorSession.sentMessages[1].payload
         val creatorResponse = json.decodeFromString<GameServerResponse>(creatorPayload)
         val secureRoomId = creatorResponse.roomId!!
+        val roomId = secureRoomId.getCleanId()
 
         // First joiner
         val joiner1 = FakeWebSocketSession()
@@ -274,7 +280,7 @@ class GameWsHandlerTest {
         assertEquals("ROOM_FULL", roomFullEvent.toString())
 
         // Room should still exist and contain only two players
-        val room = gameWsHandler.gameRooms[secureRoomId]
+        val room = gameWsHandler.gameRooms[roomId]
         assertTrue(room?.socketList?.size == 2)
         assertTrue(room.socketList.contains(creatorSession) == true)
         assertTrue(room.socketList.contains(joiner1) == true)
@@ -293,9 +299,10 @@ class GameWsHandlerTest {
         gameWsHandler.afterConnectionEstablished(session1)
 
         val response1 = json.decodeFromString<GameServerResponse>(
-            session1.sentMessages.first().payload
+            session1.sentMessages[1].payload
         )
         val secureRoomId1 = response1.roomId!!
+        val room1 = secureRoomId1.getCleanId()
         val coin1 = session1.getCoin()
 
         // Joiner (player 2) joins the same room
@@ -319,7 +326,7 @@ class GameWsHandlerTest {
         assertEquals(coin2, response2.assignedChar)
 
         // Coin pool should be exhausted
-        val room = gameWsHandler.gameRooms[secureRoomId1]!!
+        val room = gameWsHandler.gameRooms[room1]!!
         assertTrue(room.availableCoins.isEmpty())
 
         // Room should contain exactly 2 players
@@ -340,15 +347,16 @@ class GameWsHandlerTest {
         gameWsHandler.afterConnectionEstablished(creatorSession)
 
         val creatorResponse = json.decodeFromString<GameServerResponse>(
-            creatorSession.sentMessages.first().payload
+            creatorSession.sentMessages[1].payload
         )
-        val roomId = creatorResponse.roomId!!
+        val secureRoomId = creatorResponse.roomId!!
+        val roomId = secureRoomId.getCleanId()
         val room = gameWsHandler.gameRooms[roomId]!!
 
         // Player 2 joins the same room
         val joinerSession = FakeWebSocketSession()
         joinerSession.attributes["action"] = "join_room"
-        joinerSession.attributes["roomId"] = roomId
+        joinerSession.attributes["roomId"] = secureRoomId
         gameWsHandler.afterConnectionEstablished(joinerSession)
 
         // -------- Act --------
@@ -384,7 +392,7 @@ class GameWsHandlerTest {
         gameWsHandler.afterConnectionEstablished(player1)
 
         val roomId = json.decodeFromString<GameServerResponse>(
-            player1.sentMessages.first().payload
+            player1.sentMessages.get(index = 1).payload
         ).roomId!!
 
         // ---------- Player 2 joins room ----------
@@ -393,19 +401,27 @@ class GameWsHandlerTest {
         player2.attributes["roomId"] = roomId
         gameWsHandler.afterConnectionEstablished(player2)
 
+        println()
+
         // ---------- Detect who got YOUR_TURN ----------
         val player1Turn = player1.sentMessages
             .map { json.decodeFromString<GameServerResponse>(it.payload).message }
-            .any { it is GameEvent.YourTurn }
+            .filterIsInstance<GameEvent.Turn>()
+            .any { it.playerCoin == player1.getCoin() }
+
+        println(player1Turn)
 
         val currentPlayer = if (player1Turn) player1 else player2
         val wrongPlayer = if (player1Turn) player2 else player1
+
+        println(currentPlayer)
+        println(wrongPlayer)
 
         // ---------- Wrong player tries to move ----------
         val moveMsg = ClientMessage(move = GridPosition(x = 0, y = 0))
         val moveStr = json.encodeToString(ClientMessage.serializer(), moveMsg)
         gameWsHandler.handleTextMessage(wrongPlayer, TextMessage(moveStr))
-
+        wrongPlayer.sentMessages.forEach { println(it.payload) }
         val invalidMoveResponse = json.decodeFromString<GameServerResponse>(
             wrongPlayer.sentMessages.last().payload
         )
@@ -415,7 +431,7 @@ class GameWsHandlerTest {
         // ---------- Correct player makes a valid move ----------
         gameWsHandler.handleTextMessage(currentPlayer, TextMessage(moveStr))
         val validMoveResponse = json.decodeFromString<GameServerResponse>(
-            currentPlayer.sentMessages.last().payload
+            currentPlayer.sentMessages.dropLast(1).last().payload
         )
 
         assertTrue(validMoveResponse.message is GameEvent.MoveAccepted)
@@ -426,7 +442,7 @@ class GameWsHandlerTest {
             nextTurnPlayer.sentMessages.last().payload
         )
 
-        assertTrue(nextTurnResponse.message is GameEvent.YourTurn)
+        assertTrue(nextTurnResponse.message is GameEvent.Turn)
 
         // ---------- Old player tries again (invalid) ----------
         val secondMoveMsg = ClientMessage(move = GridPosition(x = 1, y = 1))

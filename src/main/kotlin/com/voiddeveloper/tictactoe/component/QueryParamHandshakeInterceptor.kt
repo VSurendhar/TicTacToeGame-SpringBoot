@@ -19,8 +19,12 @@ class QueryParamHandshakeInterceptor : HandshakeInterceptor {
         val queryParams = uri.query ?: return true
 
         queryParams.split("&").forEach {
-            val (key, value) = it.split("=")
-            attributes[key] = value
+            val eqIndex = it.indexOf('=')
+            if (eqIndex != -1) {
+                val key = it.substring(0, eqIndex)
+                val value = it.substring(eqIndex + 1)
+                attributes[key] = value
+            }
         }
 
         return true

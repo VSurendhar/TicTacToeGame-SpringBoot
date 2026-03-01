@@ -5,6 +5,7 @@ import com.voiddeveloper.tictactoe.model.ClientMessage
 import com.voiddeveloper.tictactoe.model.GameEvent
 import com.voiddeveloper.tictactoe.model.GameServerResponse
 import com.voiddeveloper.tictactoe.model.GridPosition
+import com.voiddeveloper.tictactoe.utils.Utils.getCoin
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.json.Json
 import org.springframework.beans.factory.annotation.Autowired
@@ -53,7 +54,7 @@ class SimulateRealGame {
         gameWsHandler.afterConnectionEstablished(player1)
 
         val roomId = json.decodeFromString<GameServerResponse>(
-            player1.sentMessages.first().payload
+            player1.sentMessages[1].payload
         ).roomId!!
 
         val player2 = FakeWebSocketSession().apply {
@@ -80,8 +81,9 @@ class SimulateRealGame {
         // -------- Turn-based simulation --------
         while (!gameOver && moveIndex < moves.size) {
 
-            val currentPlayer = players.first {
-                it.lastGameResponse().message == GameEvent.YourTurn
+            val currentPlayer = players.first {session ->
+                val message = session.lastGameResponse().message
+                message is GameEvent.Turn && message.playerCoin == session.getCoin()
             }
 
             println("$currentPlayer is playing")

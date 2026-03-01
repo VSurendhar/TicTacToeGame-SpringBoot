@@ -24,12 +24,12 @@ class GameController(
 
         // Check win
         if (isWin(player, board)) {
-            return GameEvent.Win(player)
+            return GameEvent.Win(player , board)
         }
 
         // Check draw
         if (isDraw(board)) {
-            return GameEvent.Tie
+            return GameEvent.Tie(board)
         }
 
         // Valid move, game continues
@@ -78,6 +78,16 @@ class GameController(
         }
 
         return false
+    }
+
+    fun isGameCompleted(board: List<MutableList<Char?>>): Boolean {
+        val allPlayer = board.flatten().distinct().filterNotNull()
+        allPlayer.forEach { player ->
+            if (isWin(player, board)) {
+                return true
+            }
+        }
+        return isDraw(board)
     }
 
 }
