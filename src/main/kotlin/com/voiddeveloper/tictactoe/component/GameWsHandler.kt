@@ -401,7 +401,16 @@ class GameWsHandler : TextWebSocketHandler() {
                 userId = secureUserId, roomId = secureRoomId, assignedChar = player, message = gameEvent
             )
 
-            session.sendMessage(TextMessage(json.encodeToString(GameServerResponse.serializer(), moveResponseCurrent)))
+            if(moveResponseCurrent.message !is GameEvent.Win && moveResponseCurrent.message !is GameEvent.Tie) {
+                session.sendMessage(
+                    TextMessage(
+                        json.encodeToString(
+                            GameServerResponse.serializer(),
+                            moveResponseCurrent
+                        )
+                    )
+                )
+            }
 
             if (gameEvent is GameEvent.MoveAccepted) {
                 println("Move Accepted")
