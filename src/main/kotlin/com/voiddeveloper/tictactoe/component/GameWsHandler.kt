@@ -133,7 +133,7 @@ class GameWsHandler : TextWebSocketHandler() {
             userId = secureUserId,
             roomId = secureRoomId,
             assignedChar = session.getCoin(),
-            message = ServerEvent.YourConnected
+            message = ServerEvent.YourConnected(room.socketList.mapNotNull { it.getCoin() })
         )
 
         session.sendMessage(
@@ -202,6 +202,7 @@ class GameWsHandler : TextWebSocketHandler() {
             socketList = mutableListOf(session)
         )
 
+        val room = gameRooms[roomId]!!
         val selectedCoin = gameRooms[roomId]?.availableCoins?.random() ?: ' '
 
         session.setCoin(selectedCoin)
@@ -222,7 +223,7 @@ class GameWsHandler : TextWebSocketHandler() {
             userId = secureUserId,
             roomId = secureRoomId,
             assignedChar = session.getCoin(),
-            message = ServerEvent.YourConnected
+            message = ServerEvent.YourConnected(room.socketList.mapNotNull { it.getCoin() })
         )
 
         session.sendMessage(
@@ -271,12 +272,13 @@ class GameWsHandler : TextWebSocketHandler() {
             val secureRoomId = session.getSecureRoomId()
             val secureUserId = session.getSecureUserId()
             val roomId = session.getSecureRoomId().getCleanId()
-            val isValidRoomToken = secureRoomId?.let { tokenHandler.verifyRoomToken(it) } ?: false
+            val isValidRoomToken = gameRooms.containsKey(roomId)
             val room = roomId?.let { gameRooms[it] }
 
             // --- Invalid Room ---
             if (secureRoomId == null || !isValidRoomToken || room == null) {
                 println("Invalid Room Id or Room Id Missing 1")
+                println("$secureRoomId $isValidRoomToken $room")
                 val response = GameServerResponse(
                     message = ServerEvent.InvalidCredentials(
                         message = "Invalid Room Id or Room Id Missing"
@@ -290,6 +292,7 @@ class GameWsHandler : TextWebSocketHandler() {
             val isValidUserToken = secureUserId?.let { tokenHandler.verifyUserToken(it) } ?: false
             if (!isValidUserToken || room.socketList.none { it.id == session.id || it.getSecureUserId() == secureUserId }) {
                 println("Invalid Room Id or Room Id Missing 2")
+                println("$isValidUserToken ${room.socketList.none { it.id == session.id || it.getSecureUserId() == secureUserId }}")
                 val response = GameServerResponse(
                     message = ServerEvent.InvalidCredentials(
                         message = "Invalid User Id or User Id Missing"
@@ -441,7 +444,7 @@ class GameWsHandler : TextWebSocketHandler() {
             }
 
         } catch (e: Exception) {
-            println("Something went wrong!")
+            println("Something went wrong! ${e.message}")
             session.sendMessage(TextMessage("Something went wrong!"))
         }
 

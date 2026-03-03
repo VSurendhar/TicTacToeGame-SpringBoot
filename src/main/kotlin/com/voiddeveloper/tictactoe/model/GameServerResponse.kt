@@ -66,7 +66,7 @@ sealed interface ServerEvent : Payload {
 
     @Serializable
     @SerialName("YOU ARE CONNECTED")
-    object YourConnected : ServerEvent {
+    data class YourConnected(val players: List<Char>) : ServerEvent {
         override fun toString(): String {
             return "YOU ARE CONNECTED"
         }
