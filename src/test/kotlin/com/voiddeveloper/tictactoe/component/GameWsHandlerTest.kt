@@ -418,7 +418,7 @@ class GameWsHandlerTest {
         println(wrongPlayer)
 
         // ---------- Wrong player tries to move ----------
-        val moveMsg = ClientMessage(move = GridPosition(x = 0, y = 0))
+        val moveMsg = ClientMessage(move = GridPosition(row = 0, col = 0))
         val moveStr = json.encodeToString(ClientMessage.serializer(), moveMsg)
         gameWsHandler.handleTextMessage(wrongPlayer, TextMessage(moveStr))
         wrongPlayer.sentMessages.forEach { println(it.payload) }
@@ -445,7 +445,7 @@ class GameWsHandlerTest {
         assertTrue(nextTurnResponse.message is GameEvent.Turn)
 
         // ---------- Old player tries again (invalid) ----------
-        val secondMoveMsg = ClientMessage(move = GridPosition(x = 1, y = 1))
+        val secondMoveMsg = ClientMessage(move = GridPosition(row = 1, col = 1))
         val secondMoveStr = json.encodeToString(ClientMessage.serializer(), secondMoveMsg)
         gameWsHandler.handleTextMessage(currentPlayer, TextMessage(secondMoveStr))
 

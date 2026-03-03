@@ -360,7 +360,7 @@ class GameWsHandler : TextWebSocketHandler() {
             // --- Validate move ---
             val move = clientMessage.move
             val player = session.getCoin()
-            if (move?.x == null || move.y == null || player == null) {
+            if (move?.row == null || move.col == null || player == null) {
                 val response = GameServerResponse(
                     message = ServerEvent.InvalidCredentials(
                         message = "Player requires x and y"
@@ -371,7 +371,7 @@ class GameWsHandler : TextWebSocketHandler() {
                 return
             }
 
-            if (move.x !in 0 until room.board.size || move.y !in 0 until room.board.first().size) {
+            if (move.row !in 0 until room.board.size || move.col !in 0 until room.board.first().size) {
                 val response = GameServerResponse(
                     message = ServerEvent.InvalidCredentials(
                         message = "Invalid X and Y Coordinates"
@@ -393,7 +393,7 @@ class GameWsHandler : TextWebSocketHandler() {
 
             // --- Make move ---
             val gameEvent = gameController.mark(
-                row = move.x, col = move.y, player = player, board = room.board
+                row = move.row, col = move.col, player = player, board = room.board
             )
 
             // --- Send move to current player ---
