@@ -1,6 +1,6 @@
 package com.voiddeveloper.tictactoe.component
 
-import com.voiddeveloper.tictactoe.model.GameEvent
+import com.voiddeveloper.tictactoe.model.Payload
 import org.junit.jupiter.api.Assertions.assertNotNull
 import org.springframework.boot.test.context.SpringBootTest
 import kotlin.test.Test
@@ -29,7 +29,7 @@ class GameControllerTest {
             2 to 2 to 'X'
         )
 
-        var event: GameEvent? = null
+        var event: Payload? = null
 
         moves.forEach { (pos, player) ->
             val (row, col) = pos
@@ -39,7 +39,7 @@ class GameControllerTest {
         assertNotNull(event)
 
         // Assert that the last move triggered a Tie
-        assertTrue(event is GameEvent.Tie)
+        assertTrue(event is Payload.Tie)
 
         // Check that the board is fully filled
         val flattenedBoard = board.flatten()
@@ -62,7 +62,7 @@ class GameControllerTest {
         val event = game.mark(2, 2, 'X', board)
 
         // Assert that the event is a Win
-        assertTrue(event is GameEvent.Win)
+        assertTrue(event is Payload.Win)
 
         // Cast to access coin
         val winEvent = event
@@ -81,7 +81,7 @@ class GameControllerTest {
         val event = game.mark(1, 1, 'X', board)
 
         // Check that the returned event is MoveAccepted
-        assertTrue(event is GameEvent.MoveAccepted)
+        assertTrue(event is Payload.MoveAccepted)
 
         val moveAccepted = event
 

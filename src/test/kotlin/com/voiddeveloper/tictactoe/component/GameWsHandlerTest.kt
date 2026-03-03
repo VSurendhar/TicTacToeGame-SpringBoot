@@ -50,7 +50,7 @@ class GameWsHandlerTest {
 
         // --- Assertions ---
 
-        assertTrue(response.message is ServerEvent.RoomCreated)
+        assertTrue(response.message is Payload.RoomCreated)
 
         // The room should exist on the server
         assertTrue(gameWsHandler.gameRooms.containsKey(roomId))
@@ -87,7 +87,7 @@ class GameWsHandlerTest {
         // --- Assertions ---
 
         // Payload should be PlayerConnected
-        assertTrue(joinerResponse.message is ServerEvent.YourConnected)
+        assertTrue(joinerResponse.message is Payload.YourConnected)
 
         // Room should exist
         assertTrue(gameWsHandler.gameRooms.containsKey(roomId))
@@ -134,7 +134,7 @@ class GameWsHandlerTest {
         // --- Assertions ---
 
         // Payload should be InvalidCredentials
-        assertTrue(joinerResponse.message is ServerEvent.InvalidCredentials)
+        assertTrue(joinerResponse.message is Payload.InvalidCredentials)
         val invalidCredentials = joinerResponse.message
         assertEquals("Invalid Room Id or Room Id Missing", invalidCredentials.message)
 
@@ -196,7 +196,7 @@ class GameWsHandlerTest {
         val lastMessage = creatorSession.sentMessages.last().payload
         val response = json.decodeFromString<GameServerResponse>(lastMessage)
 
-        assertTrue(response.message is ServerEvent.PlayerDisconnected)
+        assertTrue(response.message is Payload.PlayerDisconnected)
         val disconnectedEvent = response.message
         // toString() returns the message
         assertEquals("PLAYER_DISCONNECTED", disconnectedEvent.toString())
@@ -275,7 +275,7 @@ class GameWsHandlerTest {
         // -------- Assert --------
 
         // Payload should be RoomFull
-        assertTrue(joiner2Response.message is ServerEvent.RoomFull)
+        assertTrue(joiner2Response.message is Payload.RoomFull)
         val roomFullEvent = joiner2Response.message
         assertEquals("ROOM_FULL", roomFullEvent.toString())
 
@@ -363,19 +363,19 @@ class GameWsHandlerTest {
         // After second player joins, a GameStarted event is sent to both players
         val creatorGameStartedMsg = creatorSession.sentMessages
             .map { json.decodeFromString<GameServerResponse>(it.payload) }
-            .firstOrNull { it.message is GameEvent.GameStarted }
+            .firstOrNull { it.message is Payload.GameStarted }
 
         val joinerGameStartedMsg = joinerSession.sentMessages
             .map { json.decodeFromString<GameServerResponse>(it.payload) }
-            .firstOrNull { it.message is GameEvent.GameStarted }
+            .firstOrNull { it.message is Payload.GameStarted }
 
         // -------- Assert --------
         assertNotNull(creatorGameStartedMsg)
         assertNotNull(joinerGameStartedMsg)
 
         // Type-safe check for GameStarted event
-        assertTrue(creatorGameStartedMsg!!.message is GameEvent.GameStarted)
-        assertTrue(joinerGameStartedMsg!!.message is GameEvent.GameStarted)
+        assertTrue(creatorGameStartedMsg!!.message is Payload.GameStarted)
+        assertTrue(joinerGameStartedMsg!!.message is Payload.GameStarted)
 
         // The room should now contain exactly two players
         assertEquals(2, room.socketList.size)
@@ -406,7 +406,7 @@ class GameWsHandlerTest {
         // ---------- Detect who got YOUR_TURN ----------
         val player1Turn = player1.sentMessages
             .map { json.decodeFromString<GameServerResponse>(it.payload).message }
-            .filterIsInstance<GameEvent.Turn>()
+            .filterIsInstance<Payload.Turn>()
             .any { it.playerCoin == player1.getCoin() }
 
         println(player1Turn)
@@ -426,7 +426,7 @@ class GameWsHandlerTest {
             wrongPlayer.sentMessages.last().payload
         )
 
-        assertTrue(invalidMoveResponse.message is GameEvent.InvalidMove)
+        assertTrue(invalidMoveResponse.message is Payload.InvalidMove)
 
         // ---------- Correct player makes a valid move ----------
         gameWsHandler.handleTextMessage(currentPlayer, TextMessage(moveStr))
@@ -434,7 +434,7 @@ class GameWsHandlerTest {
             currentPlayer.sentMessages.dropLast(1).last().payload
         )
 
-        assertTrue(validMoveResponse.message is GameEvent.MoveAccepted)
+        assertTrue(validMoveResponse.message is Payload.MoveAccepted)
 
         // ---------- Turn toggles to other player ----------
         val nextTurnPlayer = if (currentPlayer == player1) player2 else player1
@@ -442,7 +442,7 @@ class GameWsHandlerTest {
             nextTurnPlayer.sentMessages.last().payload
         )
 
-        assertTrue(nextTurnResponse.message is GameEvent.Turn)
+        assertTrue(nextTurnResponse.message is Payload.Turn)
 
         // ---------- Old player tries again (invalid) ----------
         val secondMoveMsg = ClientMessage(move = GridPosition(row = 1, col = 1))
@@ -453,7 +453,7 @@ class GameWsHandlerTest {
             currentPlayer.sentMessages.last().payload
         )
 
-        assertTrue(secondInvalidResponse.message is GameEvent.InvalidMove)
+        assertTrue(secondInvalidResponse.message is Payload.InvalidMove)
     }
 
 }

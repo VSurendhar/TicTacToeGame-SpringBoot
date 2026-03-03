@@ -2,9 +2,9 @@ package com.voiddeveloper.tictactoe.component
 
 import com.voiddeveloper.tictactoe.FakeWebSocketSession
 import com.voiddeveloper.tictactoe.model.ClientMessage
-import com.voiddeveloper.tictactoe.model.GameEvent
 import com.voiddeveloper.tictactoe.model.GameServerResponse
 import com.voiddeveloper.tictactoe.model.GridPosition
+import com.voiddeveloper.tictactoe.model.Payload
 import com.voiddeveloper.tictactoe.utils.Utils.getCoin
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.json.Json
@@ -83,7 +83,7 @@ class SimulateRealGame {
 
             val currentPlayer = players.first {session ->
                 val message = session.lastGameResponse().message
-                message is GameEvent.Turn && message.playerCoin == session.getCoin()
+                message is Payload.Turn && message.playerCoin == session.getCoin()
             }
 
             println("$currentPlayer is playing")
@@ -96,12 +96,12 @@ class SimulateRealGame {
 
             when (response.message) {
 
-                is GameEvent.Win -> {
+                is Payload.Win -> {
                     gameOver = true
                     println("${response.userId} ${response.assignedChar} WON the Game")
                 }
 
-                GameEvent.Tie -> {
+                is Payload.Tie -> {
                     gameOver = true
                     println("DRAW detected")
                 }

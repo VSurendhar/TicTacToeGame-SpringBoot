@@ -1,6 +1,6 @@
 package com.voiddeveloper.tictactoe.component
 
-import com.voiddeveloper.tictactoe.model.GameEvent
+import com.voiddeveloper.tictactoe.model.Payload
 import com.voiddeveloper.tictactoe.utils.Utils.snapShotList
 
 class GameController(
@@ -12,11 +12,11 @@ class GameController(
         col: Int,
         player: Char,
         board: List<MutableList<Char?>>
-    ): GameEvent {
+    ): Payload {
 
         // Invalid index or already filled
         if (row !in 0 until size || col !in 0 until size || board[row][col] != null) {
-            return GameEvent.AlreadyFilled
+            return Payload.AlreadyFilled
         }
 
         // Mark the board
@@ -24,16 +24,16 @@ class GameController(
 
         // Check win
         if (isWin(player, board)) {
-            return GameEvent.Win(player , board)
+            return Payload.Win(player , board)
         }
 
         // Check draw
         if (isDraw(board)) {
-            return GameEvent.Tie(board)
+            return Payload.Tie(board)
         }
 
         // Valid move, game continues
-        return GameEvent.MoveAccepted(
+        return Payload.MoveAccepted(
             board = board.snapShotList()
         )
     }

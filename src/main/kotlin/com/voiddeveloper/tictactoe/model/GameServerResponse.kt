@@ -13,14 +13,11 @@ data class GameServerResponse(
 )
 
 @Serializable
-sealed interface Payload
-
-@Serializable
-sealed interface ServerEvent : Payload {
+sealed interface Payload {
 
     @Serializable
     @SerialName("PLAYER_CONNECTED")
-    object PlayerConnected : ServerEvent {
+    object PlayerConnected : Payload {
         override fun toString(): String {
             return "PLAYER_CONNECTED"
         }
@@ -28,7 +25,7 @@ sealed interface ServerEvent : Payload {
 
     @Serializable
     @SerialName("PLAYER_DISCONNECTED")
-    object PlayerDisconnected : ServerEvent {
+    object PlayerDisconnected : Payload {
         override fun toString(): String {
             return "PLAYER_DISCONNECTED"
         }
@@ -36,7 +33,7 @@ sealed interface ServerEvent : Payload {
 
     @Serializable
     @SerialName("ROOM_FULL")
-    object RoomFull : ServerEvent {
+    object RoomFull : Payload {
         override fun toString(): String {
             return "ROOM_FULL"
         }
@@ -44,7 +41,7 @@ sealed interface ServerEvent : Payload {
 
     @Serializable
     @SerialName("INVALID_ACTION")
-    object InvalidAction : ServerEvent {
+    object InvalidAction : Payload {
         override fun toString(): String {
             return "INVALID_ACTION"
         }
@@ -54,11 +51,11 @@ sealed interface ServerEvent : Payload {
     @SerialName("INVALID_CREDENTIALS")
     data class InvalidCredentials(
         val message: String,
-    ) : ServerEvent
+    ) : Payload
 
     @Serializable
     @SerialName("ROOM_CREATED")
-    object RoomCreated : ServerEvent {
+    object RoomCreated : Payload {
         override fun toString(): String {
             return "ROOM_CREATED"
         }
@@ -66,20 +63,16 @@ sealed interface ServerEvent : Payload {
 
     @Serializable
     @SerialName("YOU ARE CONNECTED")
-    data class YourConnected(val players: List<Char>) : ServerEvent {
+    data class YourConnected(val players: List<Char>) : Payload {
         override fun toString(): String {
             return "YOU ARE CONNECTED"
         }
     }
-}
 
-
-@Serializable
-sealed interface GameEvent : Payload {
 
     @Serializable
     @SerialName("GAME_STARTED")
-    object GameStarted : GameEvent {
+    object GameStarted : Payload {
         override fun toString(): String {
             return "GAME_STARTED"
         }
@@ -89,11 +82,11 @@ sealed interface GameEvent : Payload {
     @SerialName("MOVE_ACCEPTED")
     data class MoveAccepted(
         val board: List<List<Char?>>,
-    ) : GameEvent
+    ) : Payload
 
     @Serializable
     @SerialName("ALREADY_FILLED")
-    object AlreadyFilled : GameEvent {
+    object AlreadyFilled : Payload {
         override fun toString(): String {
             return "ALREADY_FILLED"
         }
@@ -101,11 +94,11 @@ sealed interface GameEvent : Payload {
 
     @Serializable
     @SerialName("TURN")
-    data class Turn(val playerCoin: Char?, val board: List<List<Char?>>) : GameEvent
+    data class Turn(val playerCoin: Char?, val board: List<List<Char?>>) : Payload
 
     @Serializable
     @SerialName("INVALID_MOVE")
-    object InvalidMove : GameEvent {
+    object InvalidMove : Payload {
         override fun toString(): String {
             return "INVALID_MOVE"
         }
@@ -116,11 +109,11 @@ sealed interface GameEvent : Payload {
     data class Win(
         val coin: Char,
         val board: List<List<Char?>>
-    ) : GameEvent
+    ) : Payload
 
     @Serializable
     @SerialName("TIE")
-    data class Tie(val board: List<List<Char?>>) : GameEvent {
+    data class Tie(val board: List<List<Char?>>) : Payload {
         override fun toString(): String {
             return "TIE"
         }
