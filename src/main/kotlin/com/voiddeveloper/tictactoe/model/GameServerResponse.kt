@@ -25,7 +25,7 @@ sealed interface Payload {
 
     @Serializable
     @SerialName("PLAYER_DISCONNECTED")
-    object PlayerDisconnected : Payload {
+    data class PlayerDisconnected(val assignedChar: Char?) : Payload {
         override fun toString(): String {
             return "PLAYER_DISCONNECTED"
         }

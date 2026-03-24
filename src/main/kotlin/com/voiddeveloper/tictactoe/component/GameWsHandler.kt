@@ -252,7 +252,7 @@ class GameWsHandler : TextWebSocketHandler() {
         // Notify remaining players
         room.socketList.forEach { otherSession ->
             val response = GameServerResponse(
-                message = Payload.PlayerDisconnected
+                message = Payload.PlayerDisconnected(disconnectedCoin)
             )
             otherSession.sendMessage(
                 TextMessage(json.encodeToString(GameServerResponse.serializer(), response))
