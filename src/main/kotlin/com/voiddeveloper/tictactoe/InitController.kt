@@ -9,7 +9,8 @@ import org.springframework.web.bind.annotation.RequestMapping
 class InitController {
 
     @RequestMapping("/")
-    fun isAlive() : ResponseEntity<String> {
-        return ResponseEntity.ok("I am alive")
+    fun isAlive(): ResponseEntity<String> {
+        return ResponseEntity.ok("""{"status": "alive"}""")
     }
+
 }
