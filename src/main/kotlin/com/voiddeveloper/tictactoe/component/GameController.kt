@@ -38,7 +38,7 @@ class GameController(
         )
     }
 
-    private fun isDraw(board: List<MutableList<Char?>>): Boolean {
+    private fun isDraw(board: List<List<Char?>>): Boolean {
         val allFilled = board.all { row -> row.all { it != null } }
         val coins = board.flatten().distinct()
         coins.forEach { coin ->
@@ -49,7 +49,7 @@ class GameController(
         return allFilled
     }
 
-    private fun isWin(player: Char?, board: List<MutableList<Char?>>): Boolean {
+    private fun isWin(player: Char?, board: List<List<Char?>>): Boolean {
 
         if (player == null) return false
 
@@ -80,7 +80,7 @@ class GameController(
         return false
     }
 
-    fun isGameCompleted(board: List<MutableList<Char?>>): Boolean {
+    fun isGameCompleted(board: List<List<Char?>>): Boolean {
         val allPlayer = board.flatten().distinct().filterNotNull()
         allPlayer.forEach { player ->
             if (isWin(player, board)) {

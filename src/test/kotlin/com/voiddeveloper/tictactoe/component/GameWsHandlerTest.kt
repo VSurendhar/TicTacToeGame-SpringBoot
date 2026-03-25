@@ -57,7 +57,7 @@ class GameWsHandlerTest {
 
         // Session should be added to room
         val room = gameWsHandler.gameRooms[roomId]
-        assertTrue(room?.socketList?.firstOrNull { it == session1 } != null)
+        assertTrue(room?.getSocketListSnapshot()?.firstOrNull { it == session1 } != null)
     }
 
     @Test
@@ -94,8 +94,8 @@ class GameWsHandlerTest {
 
         // Room should contain both sessions
         val roomSessions = gameWsHandler.gameRooms[roomId]
-        assertTrue(roomSessions?.socketList?.contains(creatorSession) == true)
-        assertTrue(roomSessions.socketList.contains(joinerSession) == true)
+        assertTrue(roomSessions?.containsSocket(creatorSession) == true)
+        assertTrue(roomSessions?.containsSocket(joinerSession) == true)
 
     }
 
@@ -145,10 +145,10 @@ class GameWsHandlerTest {
         // Original room should still exist with the creator
         assertTrue(gameWsHandler.gameRooms.containsKey(roomId))
         val room = gameWsHandler.gameRooms[roomId]
-        assertTrue(room?.socketList?.contains(creatorSession) == true)
+        assertTrue(room?.containsSocket(creatorSession) == true)
 
         // Joiner should not be added to the room
-        assertFalse(room.socketList.contains(joinerSession) == true)
+        assertFalse(room?.containsSocket(joinerSession) == true)
     }
 
     @Test
@@ -177,8 +177,8 @@ class GameWsHandlerTest {
         // Capture joiner's data before disconnect
         val joinerCoin = joinerSession.getCoin()
 
-        assertTrue(room.socketList.contains(joinerSession))
-        assertFalse(room.availableCoins.contains(joinerCoin))
+        assertTrue(room.containsSocket(joinerSession))
+        assertFalse(room.getAvailableCoinsSnapshot().contains(joinerCoin))
 
         // -------- Act --------
 
@@ -187,10 +187,10 @@ class GameWsHandlerTest {
         // -------- Assert --------
 
         // 1️⃣ Joiner removed from room
-        assertFalse(room.socketList.contains(joinerSession))
+        assertFalse(room.containsSocket(joinerSession))
 
         // 2️⃣ Coin returned to available pool
-        assertTrue(room.availableCoins.contains(joinerCoin))
+        assertTrue(room.getAvailableCoinsSnapshot().contains(joinerCoin))
 
         // 3️⃣ Creator receives PlayerDisconnected event
         val lastMessage = creatorSession.sentMessages.last().payload
@@ -226,10 +226,10 @@ class GameWsHandlerTest {
         val roomBeforeClose = gameWsHandler.gameRooms[roomId]!!
 
         // Room should exist and contain the session
-        assertTrue(roomBeforeClose.socketList.contains(session))
+        assertTrue(roomBeforeClose.containsSocket(session))
 
         val assignedCoin = session.getCoin()
-        assertFalse(roomBeforeClose.availableCoins.contains(assignedCoin))
+        assertFalse(roomBeforeClose.getAvailableCoinsSnapshot().contains(assignedCoin))
 
         // -------- Act --------
         gameWsHandler.afterConnectionClosed(session, CloseStatus.NORMAL)
@@ -281,10 +281,10 @@ class GameWsHandlerTest {
 
         // Room should still exist and contain only two players
         val room = gameWsHandler.gameRooms[roomId]
-        assertTrue(room?.socketList?.size == 2)
-        assertTrue(room.socketList.contains(creatorSession) == true)
-        assertTrue(room.socketList.contains(joiner1) == true)
-        assertFalse(room.socketList.contains(joiner2) == true)
+        assertTrue(room?.getSocketCount() == 2)
+        assertTrue(room?.containsSocket(creatorSession) == true)
+        assertTrue(room?.containsSocket(joiner1) == true)
+        assertFalse(room?.containsSocket(joiner2) == true)
     }
 
 
@@ -327,12 +327,12 @@ class GameWsHandlerTest {
 
         // Coin pool should be exhausted
         val room = gameWsHandler.gameRooms[room1]!!
-        assertTrue(room.availableCoins.isEmpty())
+        assertTrue(room.getAvailableCoinsSnapshot().isEmpty())
 
         // Room should contain exactly 2 players
-        assertTrue(room.socketList.size == 2)
-        assertTrue(room.socketList.contains(session1))
-        assertTrue(room.socketList.contains(session2))
+        assertTrue(room.getSocketCount() == 2)
+        assertTrue(room.containsSocket(session1))
+        assertTrue(room.containsSocket(session2))
     }
 
 
@@ -378,9 +378,9 @@ class GameWsHandlerTest {
         assertTrue(joinerGameStartedMsg!!.message is Payload.GameStarted)
 
         // The room should now contain exactly two players
-        assertEquals(2, room.socketList.size)
-        assertTrue(room.socketList.contains(creatorSession))
-        assertTrue(room.socketList.contains(joinerSession))
+        assertEquals(2, room.getSocketCount())
+        assertTrue(room.containsSocket(creatorSession))
+        assertTrue(room.containsSocket(joinerSession))
     }
 
     @Test

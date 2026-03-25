@@ -1,6 +1,9 @@
 package com.voiddeveloper.tictactoe.component
 
-import com.voiddeveloper.tictactoe.model.*
+import com.voiddeveloper.tictactoe.model.ClientMessage
+import com.voiddeveloper.tictactoe.model.GameServerResponse
+import com.voiddeveloper.tictactoe.model.Payload
+import com.voiddeveloper.tictactoe.model.Room
 import com.voiddeveloper.tictactoe.utils.Utils.generateRandomCode
 import com.voiddeveloper.tictactoe.utils.Utils.getCleanId
 import com.voiddeveloper.tictactoe.utils.Utils.getCoin
@@ -97,7 +100,7 @@ class GameWsHandler : TextWebSocketHandler() {
         }
 
         // Room full check
-        if (room.socketList.size == 2) {
+        if (room.isRoomFull()) {
 
             val response = GameServerResponse(
                 message = Payload.RoomFull
@@ -116,11 +119,10 @@ class GameWsHandler : TextWebSocketHandler() {
         session.setSecureUserId(secureUserId)
 
         // Assign coin
-        val availableCoin = room.availableCoins.first()
-        room.availableCoins.remove(availableCoin)
+        val availableCoin = room.pickAndRemoveFirstAvailableCoin()!!
         session.setCoin(availableCoin)
 
-        room.socketList.add(session)
+        room.addSocket(session)
 
         // Notify joined player to others
         val joinedResponse = GameServerResponse(
@@ -133,7 +135,7 @@ class GameWsHandler : TextWebSocketHandler() {
             userId = secureUserId,
             roomId = secureRoomId,
             assignedChar = session.getCoin(),
-            message = Payload.YourConnected(room.socketList.mapNotNull { it.getCoin() })
+            message = Payload.YourConnected(room.getSocketListSnapshot().mapNotNull { it.getCoin() })
         )
 
         session.sendMessage(
@@ -141,21 +143,26 @@ class GameWsHandler : TextWebSocketHandler() {
         )
 
 
-        room.socketList.filter { it.id != session.id }.forEach { session ->
+        room.getSocketListSnapshot().filter { it.id != session.id }.forEach { session ->
             session.sendMessage(
-                TextMessage(json.encodeToString(GameServerResponse.serializer(), joinedResponse.copy(userId = null)))
+                TextMessage(
+                    json.encodeToString(
+                        GameServerResponse.serializer(),
+                        joinedResponse.copy(userId = null)
+                    )
+                )
             )
         }
 
-        if (room.socketList.size == 2) {
+        if (room.isRoomFull()) {
 
-            clearGame(room.board)
+            room.clearBoard()
 
             val gameStarted = GameServerResponse(
                 roomId = secureRoomId, message = Payload.GameStarted
             )
 
-            room.socketList.forEach {
+            room.getSocketListSnapshot().forEach {
                 it.sendMessage(
                     TextMessage(json.encodeToString(GameServerResponse.serializer(), gameStarted))
                 )
@@ -166,13 +173,13 @@ class GameWsHandler : TextWebSocketHandler() {
                 room.toggleSocketList()
             }
 
-            val currentSocket = room.socketList.first()
+            val currentSocket = room.getCurrentSocket()!!
             val yourTurnResponse = GameServerResponse(
-                message = Payload.Turn(playerCoin = currentSocket.getCoin(), board = room.board)
+                message = Payload.Turn(playerCoin = currentSocket.getCoin(), board = room.getBoardSnapshot())
             )
 
             // --- Broadcast turn to All players ---
-            room.socketList.forEach { otherSession ->
+            room.getSocketListSnapshot().forEach { otherSession ->
                 otherSession.sendMessage(
                     TextMessage(
                         json.encodeToString(
@@ -198,16 +205,14 @@ class GameWsHandler : TextWebSocketHandler() {
         session.setSecureUserId(secureUserId)
         session.setSecureRoomId(secureRoomId)
 
-        gameRooms[roomId] = Room(
-            socketList = mutableListOf(session)
-        )
+        gameRooms[roomId] = Room()
 
         val room = gameRooms[roomId]!!
-        val selectedCoin = gameRooms[roomId]?.availableCoins?.random() ?: ' '
+        room.addSocket(session)
+        val selectedCoin = room.getAvailableCoinsSnapshot().randomOrNull() ?: ' '
 
         session.setCoin(selectedCoin)
-        gameRooms[roomId]?.availableCoins?.remove(selectedCoin)
-
+        room.removeAvailableCoin(selectedCoin)
 
         val response = GameServerResponse(
             message = Payload.RoomCreated,
@@ -223,7 +228,7 @@ class GameWsHandler : TextWebSocketHandler() {
             userId = secureUserId,
             roomId = secureRoomId,
             assignedChar = session.getCoin(),
-            message = Payload.YourConnected(room.socketList.mapNotNull { it.getCoin() })
+            message = Payload.YourConnected(room.getSocketListSnapshot().mapNotNull { it.getCoin() })
         )
 
         session.sendMessage(
@@ -239,18 +244,18 @@ class GameWsHandler : TextWebSocketHandler() {
         val roomId = secureRoomId.getCleanId()
         val room = gameRooms[roomId] ?: return
 
-        if (!room.socketList.contains(session)) return
+        if (!room.containsSocket(session)) return
 
         val disconnectedCoin = session.getCoin()
 
         // Remove disconnected player from room
-        room.socketList.remove(session)
+        room.removeSocket(session)
 
         // Return the coin to the pool
-        disconnectedCoin?.let { room.availableCoins.add(it) }
+        disconnectedCoin?.let { room.addAvailableCoin(it) }
 
         // Notify remaining players
-        room.socketList.forEach { otherSession ->
+        room.getSocketListSnapshot().forEach { otherSession ->
             val response = GameServerResponse(
                 message = Payload.PlayerDisconnected(disconnectedCoin)
             )
@@ -260,7 +265,7 @@ class GameWsHandler : TextWebSocketHandler() {
         }
 
         // Remove room if empty
-        if (room.socketList.isEmpty()) {
+        if (room.isRoomEmpty()) {
             gameRooms.remove(roomId)
         }
     }
@@ -273,7 +278,17 @@ class GameWsHandler : TextWebSocketHandler() {
             val secureUserId = session.getSecureUserId()
             val roomId = session.getSecureRoomId().getCleanId()
             val isValidRoomToken = gameRooms.containsKey(roomId)
-            val room = roomId?.let { gameRooms[it] }
+            val room = roomId?.let { gameRooms[it] } ?: run {
+                println("Invalid Room Id or Room Id Missing 0")
+                println("$secureRoomId $isValidRoomToken $roomId")
+                val response = GameServerResponse(
+                    message = Payload.InvalidCredentials(
+                        message = "Invalid Room Id or Room Id Missing"
+                    )
+                )
+                session.sendMessage(TextMessage(json.encodeToString(GameServerResponse.serializer(), response)))
+                return
+            }
 
             // --- Invalid Room ---
             if (secureRoomId == null || !isValidRoomToken || room == null) {
@@ -290,9 +305,9 @@ class GameWsHandler : TextWebSocketHandler() {
 
             // --- Invalid User ---
             val isValidUserToken = secureUserId?.let { tokenHandler.verifyUserToken(it) } ?: false
-            if (!isValidUserToken || room.socketList.none { it.id == session.id || it.getSecureUserId() == secureUserId }) {
-                println("Invalid Room Id or Room Id Missing 2")
-                println("$isValidUserToken ${room.socketList.none { it.id == session.id || it.getSecureUserId() == secureUserId }}")
+            if (!isValidUserToken || room.getSocketListSnapshot()
+                    .none { it.id == session.id || it.getSecureUserId() == secureUserId }
+            ) {
                 val response = GameServerResponse(
                     message = Payload.InvalidCredentials(
                         message = "Invalid User Id or User Id Missing"
@@ -307,14 +322,12 @@ class GameWsHandler : TextWebSocketHandler() {
 
             // --- Clear Game Request ---
             if (clientMessage.clearGame == true) {
-                clearGame(room.board)
-                println("Clearing Game Request")
-                printBoard(board = room.board)
+                room.clearBoard()
                 val gameStarted = GameServerResponse(
                     roomId = secureRoomId, message = Payload.GameStarted
                 )
 
-                room.socketList.forEach {
+                room.getSocketListSnapshot().forEach {
                     it.sendMessage(
                         TextMessage(
                             json.encodeToString(
@@ -328,13 +341,13 @@ class GameWsHandler : TextWebSocketHandler() {
                     room.toggleSocketList()
                 }
 
-                val currentSocket = room.socketList.first()
+                val currentSocket = room.getCurrentSocket()!!
                 val yourTurnResponse = GameServerResponse(
-                    message = Payload.Turn(playerCoin = currentSocket.getCoin(), board = room.board)
+                    message = Payload.Turn(playerCoin = currentSocket.getCoin(), board = room.getBoardSnapshot())
                 )
 
                 // --- Broadcast turn to All players ---
-                room.socketList.forEach { otherSession ->
+                room.getSocketListSnapshot().forEach { otherSession ->
                     otherSession.sendMessage(
                         TextMessage(
                             json.encodeToString(
@@ -348,7 +361,7 @@ class GameWsHandler : TextWebSocketHandler() {
             }
 
             // --- Enforce correct turn ---
-            val correctPlayerId = room.socketList.first().getSecureUserId()
+            val correctPlayerId = room.getCurrentSocket()?.getSecureUserId()
             if (correctPlayerId != secureUserId) {
                 val invalidMove = GameServerResponse(
                     message = Payload.InvalidMove
@@ -371,7 +384,8 @@ class GameWsHandler : TextWebSocketHandler() {
                 return
             }
 
-            if (move.row !in 0 until room.board.size || move.col !in 0 until room.board.first().size) {
+            val boardSnapshot = room.getBoardSnapshot()
+            if (move.row !in 0 until boardSnapshot.size || move.col !in 0 until boardSnapshot.first().size) {
                 val response = GameServerResponse(
                     message = Payload.InvalidCredentials(
                         message = "Invalid X and Y Coordinates"
@@ -382,7 +396,7 @@ class GameWsHandler : TextWebSocketHandler() {
                 return
             }
 
-            if (gameController.isGameCompleted(board = room.board)) {
+            if (gameController.isGameCompleted(board = room.getBoardSnapshot())) {
                 println("Game Completed | Invalid Move")
                 val response = GameServerResponse(
                     message = Payload.InvalidMove
@@ -393,7 +407,7 @@ class GameWsHandler : TextWebSocketHandler() {
 
             // --- Make move ---
             val payload = gameController.mark(
-                row = move.row, col = move.col, player = player, board = room.board
+                row = move.row, col = move.col, player = player, board = room.getExactBoard()
             )
 
             // --- Send move to current player ---
@@ -401,7 +415,7 @@ class GameWsHandler : TextWebSocketHandler() {
                 userId = secureUserId, roomId = secureRoomId, assignedChar = player, message = payload
             )
 
-            if(moveResponseCurrent.message !is Payload.Win && moveResponseCurrent.message !is Payload.Tie) {
+            if (moveResponseCurrent.message !is Payload.Win && moveResponseCurrent.message !is Payload.Tie) {
                 session.sendMessage(
                     TextMessage(
                         json.encodeToString(
@@ -413,18 +427,16 @@ class GameWsHandler : TextWebSocketHandler() {
             }
 
             if (payload is Payload.MoveAccepted) {
-                println("Move Accepted")
-                printBoard(board = room.board)
                 // --- Toggle turn ---
                 room.toggleSocketList()
 
-                val currentSocket = room.socketList.first()
+                val currentSocket = room.getCurrentSocket()!!
                 val yourTurnResponse = GameServerResponse(
-                    message = Payload.Turn(playerCoin = currentSocket.getCoin(), board = room.board)
+                    message = Payload.Turn(playerCoin = currentSocket.getCoin(), board = room.getBoardSnapshot())
                 )
 
                 // --- Broadcast turn to All players ---
-                room.socketList.forEach { otherSession ->
+                room.getSocketListSnapshot().forEach { otherSession ->
                     otherSession.sendMessage(
                         TextMessage(
                             json.encodeToString(
@@ -435,12 +447,10 @@ class GameWsHandler : TextWebSocketHandler() {
                 }
 
             } else if (payload is Payload.Win || payload is Payload.Tie) {
-                println("Game is Win or Game is Tie")
                 val eventResponse = GameServerResponse(
                     message = payload
                 )
-                printBoard(board = room.board)
-                room.socketList.forEach { otherSession ->
+                room.getSocketListSnapshot().forEach { otherSession ->
                     otherSession.sendMessage(
                         TextMessage(
                             json.encodeToString(
@@ -459,13 +469,6 @@ class GameWsHandler : TextWebSocketHandler() {
 
     }
 
-    private fun clearGame(board: List<MutableList<Char?>>) {
-        board.forEach { row ->
-            for (i in row.indices) {
-                row[i] = null
-            }
-        }
-    }
 
     fun printBoard(board: List<List<Char?>>) {
 
