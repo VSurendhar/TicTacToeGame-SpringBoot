@@ -9,9 +9,11 @@ import com.voiddeveloper.tictactoe.utils.Utils.getCleanId
 import com.voiddeveloper.tictactoe.utils.Utils.getCoin
 import com.voiddeveloper.tictactoe.utils.Utils.getSecureRoomId
 import com.voiddeveloper.tictactoe.utils.Utils.getSecureUserId
+import com.voiddeveloper.tictactoe.utils.Utils.safeSendMessage
 import com.voiddeveloper.tictactoe.utils.Utils.setCoin
 import com.voiddeveloper.tictactoe.utils.Utils.setSecureRoomId
 import com.voiddeveloper.tictactoe.utils.Utils.setSecureUserId
+import com.voiddeveloper.tictactoe.utils.Utils.somethingWentWrong
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.json.Json
 import org.springframework.beans.factory.annotation.Autowired
@@ -52,11 +54,11 @@ class GameWsHandler : TextWebSocketHandler() {
                         message = Payload.InvalidAction
                     )
                     val responseStr = json.encodeToString(GameServerResponse.serializer(), response)
-                    session.sendMessage(TextMessage(responseStr))
+                    session.safeSendMessage(responseStr)
                 }
             }
         } catch (e: Exception) {
-            session.sendMessage(TextMessage("Something went wrong!"))
+            session.safeSendMessage(somethingWentWrong())
         }
     }
 
@@ -222,7 +224,7 @@ class GameWsHandler : TextWebSocketHandler() {
             GameServerResponse.serializer(), response
         )
 
-        session.sendMessage(TextMessage(responseStr))
+        session.safeSendMessage(responseStr)
 
         val connectedResponse = GameServerResponse(
             userId = secureUserId,
@@ -286,7 +288,7 @@ class GameWsHandler : TextWebSocketHandler() {
                         message = "Invalid Room Id or Room Id Missing"
                     )
                 )
-                session.sendMessage(TextMessage(json.encodeToString(GameServerResponse.serializer(), response)))
+                session.safeSendMessage(json.encodeToString(GameServerResponse.serializer(), response))
                 return
             }
 
@@ -299,7 +301,7 @@ class GameWsHandler : TextWebSocketHandler() {
                         message = "Invalid Room Id or Room Id Missing"
                     )
                 )
-                session.sendMessage(TextMessage(json.encodeToString(GameServerResponse.serializer(), response)))
+                session.safeSendMessage(json.encodeToString(GameServerResponse.serializer(), response))
                 return
             }
 
@@ -313,7 +315,7 @@ class GameWsHandler : TextWebSocketHandler() {
                         message = "Invalid User Id or User Id Missing"
                     )
                 )
-                session.sendMessage(TextMessage(json.encodeToString(GameServerResponse.serializer(), response)))
+                session.safeSendMessage(json.encodeToString(GameServerResponse.serializer(), response))
                 return
             }
 
@@ -366,7 +368,7 @@ class GameWsHandler : TextWebSocketHandler() {
                 val invalidMove = GameServerResponse(
                     message = Payload.InvalidMove
                 )
-                session.sendMessage(TextMessage(json.encodeToString(GameServerResponse.serializer(), invalidMove)))
+                session.safeSendMessage(json.encodeToString(GameServerResponse.serializer(), invalidMove))
                 return
             }
 
@@ -380,7 +382,7 @@ class GameWsHandler : TextWebSocketHandler() {
                     )
                 )
                 println("Player requires x and y")
-                session.sendMessage(TextMessage(json.encodeToString(GameServerResponse.serializer(), response)))
+                session.safeSendMessage(json.encodeToString(GameServerResponse.serializer(), response))
                 return
             }
 
@@ -392,7 +394,7 @@ class GameWsHandler : TextWebSocketHandler() {
                     )
                 )
                 println("Invalid X and Y Coordinates")
-                session.sendMessage(TextMessage(json.encodeToString(GameServerResponse.serializer(), response)))
+                session.safeSendMessage(json.encodeToString(GameServerResponse.serializer(), response))
                 return
             }
 
@@ -401,7 +403,7 @@ class GameWsHandler : TextWebSocketHandler() {
                 val response = GameServerResponse(
                     message = Payload.InvalidMove
                 )
-                session.sendMessage(TextMessage(json.encodeToString(GameServerResponse.serializer(), response)))
+                session.safeSendMessage(json.encodeToString(GameServerResponse.serializer(), response))
                 return
             }
 
@@ -464,7 +466,7 @@ class GameWsHandler : TextWebSocketHandler() {
 
         } catch (e: Exception) {
             println("Something went wrong! ${e.message}")
-            session.sendMessage(TextMessage("Something went wrong!"))
+            session.safeSendMessage(somethingWentWrong())
         }
 
     }

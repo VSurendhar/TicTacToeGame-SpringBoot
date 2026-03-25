@@ -1,7 +1,10 @@
 package com.voiddeveloper.tictactoe.model
 
+import com.voiddeveloper.tictactoe.utils.Utils.json
+import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.Json
 
 
 @Serializable
@@ -108,7 +111,7 @@ sealed interface Payload {
     @SerialName("WIN")
     data class Win(
         val coin: Char,
-        val board: List<List<Char?>>
+        val board: List<List<Char?>>,
     ) : Payload
 
     @Serializable
@@ -118,5 +121,9 @@ sealed interface Payload {
             return "TIE"
         }
     }
+
+    @Serializable
+    @SerialName("SOMETHING_WENT_WRONG")
+    data class SomethingWentWrong(val message: String) : Payload
 
 }

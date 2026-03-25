@@ -1,6 +1,10 @@
 package com.voiddeveloper.tictactoe.utils
 
 
+import com.voiddeveloper.tictactoe.model.Payload
+import kotlinx.serialization.ExperimentalSerializationApi
+import kotlinx.serialization.json.Json
+import org.springframework.web.socket.TextMessage
 import org.springframework.web.socket.WebSocketSession
 import java.security.SecureRandom
 
@@ -45,5 +49,21 @@ object Utils {
 
     fun List<List<Char?>>.snapShotList() = this.map { it.toList() }
 
+    fun WebSocketSession.safeSendMessage(msg: String) {
+        if (this.isOpen) {
+            this.sendMessage(TextMessage(msg))
+        }
+    }
+
+    fun somethingWentWrong(message : String = "Something went wrong!"): String {
+        return Payload.SomethingWentWrong(message).toJson()
+    }
+
+    @OptIn(ExperimentalSerializationApi::class)
+    val json = Json {
+        explicitNulls = false
+    }
+
+    fun Payload.toJson(): String = json.encodeToString(Payload.serializer(), this)
 
 }
