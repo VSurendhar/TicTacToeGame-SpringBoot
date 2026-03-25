@@ -5,14 +5,13 @@ import com.voiddeveloper.tictactoe.model.GameServerResponse
 import com.voiddeveloper.tictactoe.model.Payload
 import com.voiddeveloper.tictactoe.model.Room
 import com.voiddeveloper.tictactoe.utils.Utils.generateRandomCode
-import com.voiddeveloper.tictactoe.utils.Utils.getCleanId
 import com.voiddeveloper.tictactoe.utils.Utils.getCoin
-import com.voiddeveloper.tictactoe.utils.Utils.getSecureRoomId
-import com.voiddeveloper.tictactoe.utils.Utils.getSecureUserId
+import com.voiddeveloper.tictactoe.utils.Utils.getRoomId
+import com.voiddeveloper.tictactoe.utils.Utils.getUserId
 import com.voiddeveloper.tictactoe.utils.Utils.safeSendMessage
 import com.voiddeveloper.tictactoe.utils.Utils.setCoin
-import com.voiddeveloper.tictactoe.utils.Utils.setSecureRoomId
-import com.voiddeveloper.tictactoe.utils.Utils.setSecureUserId
+import com.voiddeveloper.tictactoe.utils.Utils.setRoomId
+import com.voiddeveloper.tictactoe.utils.Utils.setUserId
 import com.voiddeveloper.tictactoe.utils.Utils.somethingWentWrong
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.json.Json
@@ -32,9 +31,6 @@ class GameWsHandler : TextWebSocketHandler() {
 
     val gameRooms: ConcurrentMap<String, Room> = ConcurrentHashMap()
     val gameController: GameController = GameController()
-
-    @Autowired
-    private lateinit var tokenHandler: TokenHandler
 
     @OptIn(ExperimentalSerializationApi::class)
     val json = Json {
@@ -64,9 +60,7 @@ class GameWsHandler : TextWebSocketHandler() {
 
     private fun joinRoom(session: WebSocketSession) {
 
-        val secureRoomId = session.getSecureRoomId()
-        val roomId = secureRoomId.getCleanId()
-//        val isValidRoomToken = secureRoomId?.let { tokenHandler.verifyRoomToken(it) } ?: false
+        val roomId = session.getRoomId()
 
         if (roomId == null || !gameRooms.containsKey(roomId)) {
 
@@ -117,8 +111,7 @@ class GameWsHandler : TextWebSocketHandler() {
 
         // Generate & assign user
         val userId = generateRandomCode()
-        val secureUserId = tokenHandler.createUserToken(userId)
-        session.setSecureUserId(secureUserId)
+        session.setUserId(userId)
 
         // Assign coin
         val availableCoin = room.pickAndRemoveFirstAvailableCoin()!!
@@ -128,14 +121,14 @@ class GameWsHandler : TextWebSocketHandler() {
 
         // Notify joined player to others
         val joinedResponse = GameServerResponse(
-            roomId = secureRoomId,
+            roomId = roomId,
             assignedChar = session.getCoin(),
             message = Payload.PlayerConnected
         )
 
         val connectedResponse = GameServerResponse(
-            userId = secureUserId,
-            roomId = secureRoomId,
+            userId = userId,
+            roomId = roomId,
             assignedChar = session.getCoin(),
             message = Payload.YourConnected(room.getSocketListSnapshot().mapNotNull { it.getCoin() })
         )
@@ -161,7 +154,7 @@ class GameWsHandler : TextWebSocketHandler() {
             room.clearBoard()
 
             val gameStarted = GameServerResponse(
-                roomId = secureRoomId, message = Payload.GameStarted
+                roomId = roomId, message = Payload.GameStarted
             )
 
             room.getSocketListSnapshot().forEach {
@@ -201,11 +194,8 @@ class GameWsHandler : TextWebSocketHandler() {
         val userId = generateRandomCode()
         val roomId = generateRandomCode()
 
-        val secureUserId = tokenHandler.createUserToken(userId = userId)
-        val secureRoomId = tokenHandler.createRoomToken(roomId = roomId)
-
-        session.setSecureUserId(secureUserId)
-        session.setSecureRoomId(secureRoomId)
+        session.setUserId(userId)
+        session.setRoomId(roomId)
 
         gameRooms[roomId] = Room()
 
@@ -227,8 +217,8 @@ class GameWsHandler : TextWebSocketHandler() {
         session.safeSendMessage(responseStr)
 
         val connectedResponse = GameServerResponse(
-            userId = secureUserId,
-            roomId = secureRoomId,
+            userId = userId,
+            roomId = roomId,
             assignedChar = session.getCoin(),
             message = Payload.YourConnected(room.getSocketListSnapshot().mapNotNull { it.getCoin() })
         )
@@ -242,8 +232,7 @@ class GameWsHandler : TextWebSocketHandler() {
     override fun afterConnectionClosed(session: WebSocketSession, status: CloseStatus) {
         super.afterConnectionClosed(session, status)
 
-        val secureRoomId = session.getSecureRoomId()
-        val roomId = secureRoomId.getCleanId()
+        val roomId = session.getRoomId()
         val room = gameRooms[roomId] ?: return
 
         if (!room.containsSocket(session)) return
@@ -276,13 +265,13 @@ class GameWsHandler : TextWebSocketHandler() {
         super.handleTextMessage(session, message)
         try {
 
-            val secureRoomId = session.getSecureRoomId()
-            val secureUserId = session.getSecureUserId()
-            val roomId = session.getSecureRoomId().getCleanId()
+            val roomId = session.getRoomId()
+            val userId = session.getUserId()
+
             val isValidRoomToken = gameRooms.containsKey(roomId)
             val room = roomId?.let { gameRooms[it] } ?: run {
                 println("Invalid Room Id or Room Id Missing 0")
-                println("$secureRoomId $isValidRoomToken $roomId")
+                println("$roomId $isValidRoomToken $roomId")
                 val response = GameServerResponse(
                     message = Payload.InvalidCredentials(
                         message = "Invalid Room Id or Room Id Missing"
@@ -293,9 +282,9 @@ class GameWsHandler : TextWebSocketHandler() {
             }
 
             // --- Invalid Room ---
-            if (secureRoomId == null || !isValidRoomToken || room == null) {
+            if (!isValidRoomToken) {
                 println("Invalid Room Id or Room Id Missing 1")
-                println("$secureRoomId $isValidRoomToken $room")
+                println("$roomId $room")
                 val response = GameServerResponse(
                     message = Payload.InvalidCredentials(
                         message = "Invalid Room Id or Room Id Missing"
@@ -306,9 +295,8 @@ class GameWsHandler : TextWebSocketHandler() {
             }
 
             // --- Invalid User ---
-            val isValidUserToken = secureUserId?.let { tokenHandler.verifyUserToken(it) } ?: false
-            if (!isValidUserToken || room.getSocketListSnapshot()
-                    .none { it.id == session.id || it.getSecureUserId() == secureUserId }
+            if (room.getSocketListSnapshot()
+                    .none { it.id == session.id || it.getUserId() == userId }
             ) {
                 val response = GameServerResponse(
                     message = Payload.InvalidCredentials(
@@ -326,7 +314,7 @@ class GameWsHandler : TextWebSocketHandler() {
             if (clientMessage.clearGame == true) {
                 room.clearBoard()
                 val gameStarted = GameServerResponse(
-                    roomId = secureRoomId, message = Payload.GameStarted
+                    roomId = roomId, message = Payload.GameStarted
                 )
 
                 room.getSocketListSnapshot().forEach {
@@ -363,8 +351,8 @@ class GameWsHandler : TextWebSocketHandler() {
             }
 
             // --- Enforce correct turn ---
-            val correctPlayerId = room.getCurrentSocket()?.getSecureUserId()
-            if (correctPlayerId != secureUserId) {
+            val correctPlayerId = room.getCurrentSocket()?.getUserId()
+            if (correctPlayerId != userId) {
                 val invalidMove = GameServerResponse(
                     message = Payload.InvalidMove
                 )
@@ -414,7 +402,7 @@ class GameWsHandler : TextWebSocketHandler() {
 
             // --- Send move to current player ---
             val moveResponseCurrent = GameServerResponse(
-                userId = secureUserId, roomId = secureRoomId, assignedChar = player, message = payload
+                userId = userId, roomId = roomId, assignedChar = player, message = payload
             )
 
             if (moveResponseCurrent.message !is Payload.Win && moveResponseCurrent.message !is Payload.Tie) {

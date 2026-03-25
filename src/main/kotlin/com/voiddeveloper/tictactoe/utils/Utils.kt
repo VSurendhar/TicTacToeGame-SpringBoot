@@ -19,11 +19,11 @@ object Utils {
             .joinToString("")
     }
 
-    fun WebSocketSession.getSecureRoomId(): String? {
+    fun WebSocketSession.getRoomId(): String? {
         return this.attributes["roomId"] as String
     }
 
-    fun WebSocketSession.getSecureUserId(): String? {
+    fun WebSocketSession.getUserId(): String? {
         return this.attributes["userId"] as String
     }
 
@@ -31,11 +31,11 @@ object Utils {
         return (this.attributes["coin"] as String?)?.get(0)
     }
 
-    fun WebSocketSession.setSecureUserId(userId: String) {
+    fun WebSocketSession.setUserId(userId: String) {
         this.attributes["userId"] = userId
     }
 
-    fun WebSocketSession.setSecureRoomId(roomId: String) {
+    fun WebSocketSession.setRoomId(roomId: String) {
         this.attributes["roomId"] = roomId
     }
 
