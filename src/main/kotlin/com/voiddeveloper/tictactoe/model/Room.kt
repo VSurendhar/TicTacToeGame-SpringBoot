@@ -10,6 +10,8 @@ class Room(
     private val board: List<MutableList<Char?>> = List(3) { MutableList(3) { null } },
 ) {
 
+    private val lock = ReentrantLock()
+
     fun getSocketListSnapshot(): List<WebSocketSession> {
         return socketList.toList()
     }
@@ -124,5 +126,10 @@ class Room(
         }
     }
 
+    fun <T> executeLocked(action: () -> T): T {
+        return lock.withLock {
+            action()
+        }
+    }
 
 }
