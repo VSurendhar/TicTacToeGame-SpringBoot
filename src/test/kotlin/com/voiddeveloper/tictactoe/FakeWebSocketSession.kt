@@ -14,17 +14,27 @@ class FakeWebSocketSession : WebSocketSession {
     val sentMessages = mutableListOf<TextMessage>()
     val newId = System.currentTimeMillis().toString()
 
+    private var isOpenState = true
+
     override fun getAttributes(): MutableMap<String, Any> = attrs
 
     override fun sendMessage(message: org.springframework.web.socket.WebSocketMessage<*>) {
         sentMessages.add(message as TextMessage)
     }
 
+    fun setOpen(isOpen: Boolean) {
+        isOpenState = isOpen
+    }
+
     // --- minimal stubs (unused in test) ---
     override fun getId() = System.currentTimeMillis().toString()
-    override fun isOpen() = true
-    override fun close() {}
-    override fun close(status: org.springframework.web.socket.CloseStatus) {}
+    override fun isOpen() = isOpenState
+    override fun close() {
+        isOpenState = false
+    }
+    override fun close(status: org.springframework.web.socket.CloseStatus) {
+        isOpenState = false
+    }
     override fun getUri(): URI? = null
     override fun getHandshakeHeaders(): HttpHeaders {
         return HttpHeaders()

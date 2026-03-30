@@ -83,10 +83,7 @@ class GameWsHandler : TextWebSocketHandler() {
         var shouldCloseSession = false
 
         room.executeLocked {
-            sessionMessages.addAll(checkAndCleanRoom(roomId, room))
-            if (room.isRoomEmpty()) {
-                gameRooms.remove(roomId)
-            }
+            sessionMessages.addAll(checkAndCleanRoom(roomId, room, session = session, shouldWin = false))
             if (!gameRooms.containsKey(roomId)) return@executeLocked
 
             // Room full check
@@ -190,10 +187,7 @@ class GameWsHandler : TextWebSocketHandler() {
 
             }
 
-            sessionMessages.addAll(checkAndCleanRoom(roomId, room))
-            if (room.isRoomEmpty()) {
-                gameRooms.remove(roomId)
-            }
+            sessionMessages.addAll(checkAndCleanRoom(roomId, room, session = session))
         }
 
         sessionMessages.forEach { (sess, msg) ->
@@ -205,7 +199,12 @@ class GameWsHandler : TextWebSocketHandler() {
         }
     }
 
-    private fun checkAndCleanRoom(roomId: String, room: Room): List<SessionMessage> {
+    private fun checkAndCleanRoom(
+        roomId: String,
+        room: Room,
+        session: WebSocketSession? = null,
+        shouldWin: Boolean = true
+    ): List<SessionMessage> {
         val messages = mutableListOf<SessionMessage>()
         var roomShouldBeRemoved = false
 
@@ -213,9 +212,9 @@ class GameWsHandler : TextWebSocketHandler() {
         val closedSockets = currentSockets.filter { !it.isOpen }
 
         if (closedSockets.isNotEmpty()) {
-            closedSockets.forEach { session ->
-                room.removeSocket(session)
-                session.getCoin()?.let { room.addAvailableCoinIfMissing(it) }
+            closedSockets.forEach { closedSession ->
+                room.removeSocket(closedSession)
+                closedSession.getCoin()?.let { room.addAvailableCoinIfMissing(it) }
             }
 
             val remainingSockets = room.getSocketListSnapshot()
@@ -223,11 +222,17 @@ class GameWsHandler : TextWebSocketHandler() {
                 val winnerSession = remainingSockets.first()
                 val winnerCoin = winnerSession.getCoin()!!
                 val response = GameServerResponse(
-                    message = Payload.Win(
-                        coin = winnerCoin,
-                        board = room.getBoardSnapshot(),
-                        isForced = true
-                    )
+                    message = if (shouldWin) {
+                        Payload.Win(
+                            coin = winnerCoin,
+                            board = room.getBoardSnapshot(),
+                            isForced = true
+                        )
+                    } else {
+                        Payload.InvalidCredentials(
+                            message = "Room Not Available!!!"
+                        )
+                    }
                 )
                 messages.add(
                     SessionMessage(
@@ -237,8 +242,26 @@ class GameWsHandler : TextWebSocketHandler() {
                 )
                 roomShouldBeRemoved = true
             } else if (remainingSockets.isEmpty()) {
+                if (session != null && !shouldWin) {
+                    val response = GameServerResponse(
+                        message = Payload.InvalidCredentials(
+                            message = "Room Not Available!!!"
+                        )
+                    )
+                    messages.add(
+                        SessionMessage(
+                            session,
+                            json.encodeToString(GameServerResponse.serializer(), response)
+                        )
+                    )
+                }
                 roomShouldBeRemoved = true
             }
+        }
+
+        // --- Always remove if empty ---
+        if (room.isRoomEmpty()) {
+            roomShouldBeRemoved = true
         }
 
         if (roomShouldBeRemoved) {
@@ -288,10 +311,7 @@ class GameWsHandler : TextWebSocketHandler() {
             val connectedResponseStr = json.encodeToString(GameServerResponse.serializer(), connectedResponse)
             sessionMessages.add(SessionMessage(session, connectedResponseStr))
 
-            sessionMessages.addAll(checkAndCleanRoom(roomId, room))
-            if (room.isRoomEmpty()) {
-                gameRooms.remove(roomId)
-            }
+            sessionMessages.addAll(checkAndCleanRoom(roomId, room, session = session))
         }
 
         sessionMessages.forEach { (sess, msg) ->
@@ -331,20 +351,14 @@ class GameWsHandler : TextWebSocketHandler() {
             }
 
             if(roomId!=null) {
-                sessionMessages.addAll(checkAndCleanRoom(roomId, room))
-                if (room.isRoomEmpty()) {
-                    gameRooms.remove(roomId)
-                }
+                sessionMessages.addAll(checkAndCleanRoom(roomId, room, session = session))
             }
         }
 
 //            TODO("Check for Winner without Game Play Here and remove session and close the room")
 
         if(roomId!=null) {
-            sessionMessages.addAll(checkAndCleanRoom(roomId, room))
-            if (room.isRoomEmpty()) {
-                gameRooms.remove(roomId)
-            }
+            sessionMessages.addAll(checkAndCleanRoom(roomId, room, session = session))
         }
 
         sessionMessages.forEach { (sess, msg) ->
@@ -376,10 +390,7 @@ class GameWsHandler : TextWebSocketHandler() {
 
             // Update room and check status
             room.executeLocked {
-                sessionMessages.addAll(checkAndCleanRoom(roomId, room))
-                if (room.isRoomEmpty()) {
-                    gameRooms.remove(roomId)
-                }
+                sessionMessages.addAll(checkAndCleanRoom(roomId, room, session = session))
             }
 
             if (!gameRooms.containsKey(roomId)) {
@@ -403,11 +414,7 @@ class GameWsHandler : TextWebSocketHandler() {
             }
 
         room.executeLocked {
-
-            sessionMessages.addAll(checkAndCleanRoom(roomId, room))
-            if (room.isRoomEmpty()) {
-                gameRooms.remove(roomId)
-            }
+            sessionMessages.addAll(checkAndCleanRoom(roomId, room, session = session))
             if (!gameRooms.containsKey(roomId)) return@executeLocked
 
             // --- Invalid User ---
@@ -590,10 +597,7 @@ class GameWsHandler : TextWebSocketHandler() {
 
             }
 
-            sessionMessages.addAll(checkAndCleanRoom(roomId, room))
-            if (room.isRoomEmpty()) {
-                gameRooms.remove(roomId)
-            }
+            sessionMessages.addAll(checkAndCleanRoom(roomId, room, session = session))
             if (!gameRooms.containsKey(roomId)) return@executeLocked
 
         }
