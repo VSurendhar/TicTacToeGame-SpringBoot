@@ -83,6 +83,12 @@ class GameWsHandler : TextWebSocketHandler() {
         var shouldCloseSession = false
 
         room.executeLocked {
+            sessionMessages.addAll(checkAndCleanRoom(roomId, room))
+            if (room.isRoomEmpty()) {
+                gameRooms.remove(roomId)
+            }
+            if (!gameRooms.containsKey(roomId)) return@executeLocked
+
             // Room full check
             if (room.isRoomFull()) {
 
@@ -183,6 +189,11 @@ class GameWsHandler : TextWebSocketHandler() {
                 }
 
             }
+
+            sessionMessages.addAll(checkAndCleanRoom(roomId, room))
+            if (room.isRoomEmpty()) {
+                gameRooms.remove(roomId)
+            }
         }
 
         sessionMessages.forEach { (sess, msg) ->
@@ -192,6 +203,49 @@ class GameWsHandler : TextWebSocketHandler() {
         if (shouldCloseSession) {
             session.close()
         }
+    }
+
+    private fun checkAndCleanRoom(roomId: String, room: Room): List<SessionMessage> {
+        val messages = mutableListOf<SessionMessage>()
+        var roomShouldBeRemoved = false
+
+        val currentSockets = room.getSocketListSnapshot()
+        val closedSockets = currentSockets.filter { !it.isOpen }
+
+        if (closedSockets.isNotEmpty()) {
+            closedSockets.forEach { session ->
+                room.removeSocket(session)
+                session.getCoin()?.let { room.addAvailableCoinIfMissing(it) }
+            }
+
+            val remainingSockets = room.getSocketListSnapshot()
+            if (remainingSockets.size == 1) {
+                val winnerSession = remainingSockets.first()
+                val winnerCoin = winnerSession.getCoin()!!
+                val response = GameServerResponse(
+                    message = Payload.Win(
+                        coin = winnerCoin,
+                        board = room.getBoardSnapshot(),
+                        isForced = true
+                    )
+                )
+                messages.add(
+                    SessionMessage(
+                        winnerSession,
+                        json.encodeToString(GameServerResponse.serializer(), response)
+                    )
+                )
+                roomShouldBeRemoved = true
+            } else if (remainingSockets.isEmpty()) {
+                roomShouldBeRemoved = true
+            }
+        }
+
+        if (roomShouldBeRemoved) {
+            gameRooms.remove(roomId)
+        }
+
+        return messages
     }
 
     private fun createRoom(session: WebSocketSession) {
@@ -233,6 +287,11 @@ class GameWsHandler : TextWebSocketHandler() {
 
             val connectedResponseStr = json.encodeToString(GameServerResponse.serializer(), connectedResponse)
             sessionMessages.add(SessionMessage(session, connectedResponseStr))
+
+            sessionMessages.addAll(checkAndCleanRoom(roomId, room))
+            if (room.isRoomEmpty()) {
+                gameRooms.remove(roomId)
+            }
         }
 
         sessionMessages.forEach { (sess, msg) ->
@@ -271,7 +330,18 @@ class GameWsHandler : TextWebSocketHandler() {
                 )
             }
 
-            // Remove room if empty
+            if(roomId!=null) {
+                sessionMessages.addAll(checkAndCleanRoom(roomId, room))
+                if (room.isRoomEmpty()) {
+                    gameRooms.remove(roomId)
+                }
+            }
+        }
+
+//            TODO("Check for Winner without Game Play Here and remove session and close the room")
+
+        if(roomId!=null) {
+            sessionMessages.addAll(checkAndCleanRoom(roomId, room))
             if (room.isRoomEmpty()) {
                 gameRooms.remove(roomId)
             }
@@ -302,6 +372,23 @@ class GameWsHandler : TextWebSocketHandler() {
                 return
             }
 
+            val sessionMessages = mutableListOf<SessionMessage>()
+
+            // Update room and check status
+            room.executeLocked {
+                sessionMessages.addAll(checkAndCleanRoom(roomId, room))
+                if (room.isRoomEmpty()) {
+                    gameRooms.remove(roomId)
+                }
+            }
+
+            if (!gameRooms.containsKey(roomId)) {
+                sessionMessages.forEach { (sess, msg) ->
+                    sess.safeSendMessage(msg)
+                }
+                return
+            }
+
             // --- Invalid Room ---
             if (!isValidRoomToken) {
                 println("Invalid Room Id or Room Id Missing 1")
@@ -315,9 +402,14 @@ class GameWsHandler : TextWebSocketHandler() {
                 return
             }
 
-        val sessionMessages = mutableListOf<SessionMessage>()
-
         room.executeLocked {
+
+            sessionMessages.addAll(checkAndCleanRoom(roomId, room))
+            if (room.isRoomEmpty()) {
+                gameRooms.remove(roomId)
+            }
+            if (!gameRooms.containsKey(roomId)) return@executeLocked
+
             // --- Invalid User ---
             if (room.getSocketListSnapshot()
                     .none { it.id == session.id || it.getUserId() == userId }
@@ -497,6 +589,13 @@ class GameWsHandler : TextWebSocketHandler() {
                 }
 
             }
+
+            sessionMessages.addAll(checkAndCleanRoom(roomId, room))
+            if (room.isRoomEmpty()) {
+                gameRooms.remove(roomId)
+            }
+            if (!gameRooms.containsKey(roomId)) return@executeLocked
+
         }
 
         sessionMessages.forEach { (sess, msg) ->

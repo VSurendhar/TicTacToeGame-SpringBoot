@@ -112,6 +112,7 @@ sealed interface Payload {
     data class Win(
         val coin: Char,
         val board: List<List<Char?>>,
+        val isForced : Boolean = false
     ) : Payload
 
     @Serializable
